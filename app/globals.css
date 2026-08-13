@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #0b0f0e;
+  --color-foreground: #e9ece7;
+  --color-card: #111816;
+  --color-card-foreground: #e9ece7;
+  --color-muted: #18211e;
+  --color-muted-foreground: #9ca79e;
+  --color-primary: #d6a84f;
+  --color-primary-foreground: #17120a;
+  --color-border: #28332e;
+  --color-input: #202a25;
+  --color-ring: #d6a84f;
+  --font-sans: "Arial", "Helvetica Neue", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", monospace;
+}
+
+* { border-color: var(--color-border); }
+html { scroll-behavior: smooth; }
+body { background: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #d6a84f; color: #17120a; }
+
+.ore-grid { background-image: linear-gradient(rgba(214,168,79,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(214,168,79,.06) 1px, transparent 1px); background-size: 32px 32px; }
+.scanline { background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(214,168,79,.035) 4px); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
