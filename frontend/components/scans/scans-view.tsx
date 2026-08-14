@@ -83,7 +83,7 @@ export function ScansView() {
       </div>
 
       {/* classification detail */}
-      <Card className="h-fit border-border bg-card xl:sticky xl:top-24">
+      <Card className="h-fit border-border bg-card xl:sticky xl:top-0">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Cpu className="size-4 text-primary" />
