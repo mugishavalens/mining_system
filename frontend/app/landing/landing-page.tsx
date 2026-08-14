@@ -648,19 +648,6 @@ export function LandingPage() {
         <VideoLayer src={activeVideo} overlay={0.38} />
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.05fr_.95fr]">
           <div className="max-w-3xl">
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.55 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-black/35 px-4 py-2 text-xs font-medium text-primary backdrop-blur"
-            >
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-              </span>
-              Live mineral intelligence for {KPIS.activeSites} active sites
-            </motion.div>
-
             <motion.h1
               initial={{ opacity: 0, y: 26 }}
               animate={{ opacity: 1, y: 0 }}
