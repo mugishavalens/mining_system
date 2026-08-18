@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { Loader2, MapPin, Layers, Gauge, ShieldAlert, Boxes, Drill, Eye } from 'lucide-react'
+import { Loader2, MapPin, Layers, Gauge, ShieldAlert, Boxes, Drill, Eye, Mountain, ArrowLeft, Scan, EyeOff } from 'lucide-react'
 import {
   SITES,
   RISK_META,
@@ -26,6 +26,16 @@ const GlobeScene = dynamic(() => import('@/components/map/globe-scene'), {
   ),
 })
 
+const SiteTerrainBlock = dynamic(() => import('@/components/map/site-terrain-block'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center text-muted-foreground">
+      <Loader2 className="mr-2 size-5 animate-spin" />
+      <span className="text-sm">Carving subsurface terrain block…</span>
+    </div>
+  ),
+})
+
 function riskTone(level: DetectionSite['riskLevel']) {
   return level === 'low' ? 'success' : level === 'moderate' ? 'warning' : 'danger'
 }
@@ -33,53 +43,106 @@ function riskTone(level: DetectionSite['riskLevel']) {
 export function MapExplorer() {
   const [selectedId, setSelectedId] = useState<string | null>('RW-RTG-01')
   const [showUnderground, setShowUnderground] = useState(true)
+  const [viewMode, setViewMode] = useState<'globe' | 'terrain'>('globe')
+  const [xray, setXray] = useState(false)
   const selected = SITES.find((s) => s.id === selectedId) ?? null
+
+  function selectSite(id: string) {
+    setSelectedId(id)
+    setViewMode('globe')
+    setXray(false)
+  }
 
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_360px]">
-      {/* Globe canvas */}
+      {/* 3D canvas: global overview or per-site terrain block */}
       <div className="relative min-h-[420px] overflow-hidden bg-[oklch(0.13_0.01_250)] grid-backdrop">
-        <GlobeScene selectedId={selectedId} onSelect={(s) => setSelectedId(s.id)} showUnderground={showUnderground} />
+        {viewMode === 'terrain' && selected ? (
+          <SiteTerrainBlock site={selected} xray={xray} />
+        ) : (
+          <GlobeScene selectedId={selectedId} onSelect={(s) => selectSite(s.id)} showUnderground={showUnderground} />
+        )}
 
-        {/* legend & controls */}
-        <div className="pointer-events-auto absolute left-4 top-4 space-y-3">
-          <div className="rounded-lg border border-border bg-card/85 p-3 text-xs backdrop-blur">
-            <p className="mb-2 flex items-center gap-1.5 font-medium text-foreground">
-              <Layers className="size-3.5 text-primary" /> Surface Detection Sites
-            </p>
-            <ul className="space-y-1.5">
-              {(['low', 'moderate', 'high', 'critical'] as const).map((r) => (
-                <li key={r} className="flex items-center gap-2 text-muted-foreground">
-                  <span className="size-2 rounded-full" style={{ background: RISK_META[r].token }} />
-                  {RISK_META[r].label} risk
+        {viewMode === 'globe' && (
+          <div className="pointer-events-auto absolute left-4 top-4 space-y-3">
+            <div className="rounded-lg border border-border bg-card/85 p-3 text-xs backdrop-blur">
+              <p className="mb-2 flex items-center gap-1.5 font-medium text-foreground">
+                <Layers className="size-3.5 text-primary" /> Surface Detection Sites
+              </p>
+              <ul className="space-y-1.5">
+                {(['low', 'moderate', 'high', 'critical'] as const).map((r) => (
+                  <li key={r} className="flex items-center gap-2 text-muted-foreground">
+                    <span className="size-2 rounded-full" style={{ background: RISK_META[r].token }} />
+                    {RISK_META[r].label} risk
+                  </li>
+                ))}
+                <li className="mt-1 flex items-center gap-2 border-t border-border pt-1.5 text-muted-foreground">
+                  <span className="h-0.5 w-4 rounded" style={{ background: 'var(--accent)' }} />
+                  Transport route
                 </li>
-              ))}
-              <li className="mt-1 flex items-center gap-2 border-t border-border pt-1.5 text-muted-foreground">
-                <span className="h-0.5 w-4 rounded" style={{ background: 'var(--accent)' }} />
-                Transport route
-              </li>
-              {showUnderground && (
-                <li className="flex items-center gap-2 border-t border-border pt-1.5 text-muted-foreground">
-                  <span className="size-2" style={{ color: '#9b6dff' }}>⬣</span>
-                  Underground deposits
-                </li>
-              )}
-            </ul>
+                {showUnderground && (
+                  <li className="flex items-center gap-2 border-t border-border pt-1.5 text-muted-foreground">
+                    <span className="size-2" style={{ color: '#9b6dff' }}>⬣</span>
+                    Underground deposits
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            <Button
+              variant={showUnderground ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowUnderground(!showUnderground)}
+              className="w-full justify-start gap-2 bg-card/85 dark:bg-card/85 backdrop-blur"
+            >
+              {showUnderground ? <Eye className="size-3.5" /> : <Drill className="size-3.5" />}
+              {showUnderground ? 'Viewing Subsurface' : 'Show Underground'}
+            </Button>
+
+            {selected && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setViewMode('terrain')}
+                className="w-full justify-start gap-2"
+              >
+                <Mountain className="size-3.5" />
+                Enter 3D Terrain View
+              </Button>
+            )}
           </div>
+        )}
 
-          <Button
-            variant={showUnderground ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowUnderground(!showUnderground)}
-            className="w-full justify-start gap-2"
-          >
-            {showUnderground ? <Eye className="size-3.5" /> : <Drill className="size-3.5" />}
-            {showUnderground ? 'Viewing Subsurface' : 'Show Underground'}
-          </Button>
-        </div>
+        {viewMode === 'terrain' && selected && (
+          <div className="pointer-events-auto absolute left-4 top-4 space-y-3">
+            <Button variant="outline" size="sm" onClick={() => setViewMode('globe')} className="gap-2 bg-card/85 dark:bg-card/85 backdrop-blur">
+              <ArrowLeft className="size-3.5" />
+              Back to global map
+            </Button>
+            <div className="rounded-lg border border-border bg-card/85 p-3 text-xs backdrop-blur">
+              <p className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
+                <Mountain className="size-3.5 text-primary" /> {selected.name}
+              </p>
+              <p className="text-muted-foreground">
+                {selected.primaryMineral} deposit · {selected.depthMeters}m below surface
+              </p>
+            </div>
+            <Button
+              variant={xray ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setXray(!xray)}
+              className="w-full justify-start gap-2 bg-card/85 dark:bg-card/85 backdrop-blur"
+            >
+              {xray ? <EyeOff className="size-3.5" /> : <Scan className="size-3.5" />}
+              {xray ? 'Solid Ground' : 'X-Ray: See Through Ground'}
+            </Button>
+          </div>
+        )}
 
         <div className="pointer-events-none absolute bottom-4 left-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          MDMIS · 3D Subsurface Explorer · drag · zoom · click sites
+          {viewMode === 'terrain'
+            ? 'MDMIS · Subsurface Terrain Block · drag to orbit · scroll to zoom'
+            : 'MDMIS · 3D Subsurface Explorer · drag · zoom · click sites'}
         </div>
       </div>
 
@@ -192,7 +255,7 @@ export function MapExplorer() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setSelectedId(s.id)}
+                onClick={() => selectSite(s.id)}
                 className={cn(
                   'mb-1 flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors',
                   active

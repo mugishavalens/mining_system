@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Globe, { type GlobeMethods } from 'react-globe.gl'
-import { SITES, SHIPMENTS, RISK_META, MINERAL_META, type DetectionSite } from '@/lib/mdmis-data'
+import { SITES, SHIPMENTS, RISK_META, type DetectionSite } from '@/lib/mdmis-data'
+import { MINERAL_HEX } from '@/lib/site-terrain'
 
 // three.js can't parse oklch()/lab() CSS colors, so the globe uses explicit
 // hex colors tuned to match the app's theme tokens.
@@ -76,7 +77,10 @@ export default function GlobeScene({ selectedId, onSelect, showUnderground }: Pr
     [colors],
   )
 
-  // Underground mineral deposits - hexagons showing subsurface layers
+  // Underground mineral deposits - hexagons showing subsurface layers,
+  // colored per mineral (not MINERAL_META.color, which is an oklch() CSS
+  // token three.js/react-globe.gl can't render) so deposits of different
+  // minerals are visually distinct instead of a uniform purple.
   const subsurfaceData = useMemo(() => {
     if (!showUnderground) return []
     return SITES.map((s) => ({
@@ -84,9 +88,7 @@ export default function GlobeScene({ selectedId, onSelect, showUnderground }: Pr
       lng: s.lng,
       altitude: -0.01 - (s.depthMeters / 10000), // negative altitude for underground
       size: Math.sqrt(s.estimatedTonnage) / 50,
-      color: MINERAL_META[s.primaryMineral].color.includes('var')
-        ? colors.underground
-        : MINERAL_META[s.primaryMineral].color,
+      color: MINERAL_HEX[s.primaryMineral] ?? colors.underground,
       site: s,
     }))
   }, [showUnderground, colors])
@@ -172,22 +174,26 @@ export default function GlobeScene({ selectedId, onSelect, showUnderground }: Pr
         arcDashAnimateTime={2500}
         arcAltitudeAutoScale={0.4}
         
-        // Underground mineral deposits (hexagons)
+        // Underground mineral deposits (hexagons) — height scales with depth
+        // below surface (a real "how deep" scale), color keys to mineral type
+        // so deposits don't all read as the same undifferentiated blob.
         hexBinPointsData={subsurfaceData}
         hexBinPointLat={(d: any) => d.lat}
         hexBinPointLng={(d: any) => d.lng}
-        hexAltitude={(d: any) => Math.abs(d.sumWeight) * 0.002}
-        hexTopColor={(d: any) => colors.subsurface}
-        hexSideColor={(d: any) => colors.subsurface}
+        hexBinPointWeight={(d: any) => d.site.depthMeters}
+        hexAltitude={(d: any) => 0.006 + Math.abs(d.sumWeight) * 0.0009}
+        hexTopColor={(d: any) => d.points?.[0]?.color ?? colors.underground}
+        hexSideColor={(d: any) => d.points?.[0]?.color ?? colors.underground}
         hexBinResolution={4}
         hexMargin={0.2}
         hexLabel={(d: any) => {
           const site = d.points?.[0]?.site
+          const color = d.points?.[0]?.color ?? colors.underground
           if (!site) return ''
           return `
-            <div style="font-family:var(--font-geist-sans),sans-serif;background:#1a1d23;border:1px solid rgba(155,109,255,0.4);border-radius:8px;padding:8px 10px;color:#fff">
-              <div style="font-weight:600;font-size:11px;color:#9b6dff;margin-bottom:3px">⬣ Underground Deposit</div>
-              <div style="font-size:10px;color:#9aa0a6">${site.name} · ${site.depthMeters}m depth</div>
+            <div style="font-family:var(--font-geist-sans),sans-serif;background:#1a1d23;border:1px solid ${color}66;border-radius:8px;padding:8px 10px;color:#fff">
+              <div style="font-weight:600;font-size:11px;color:${color};margin-bottom:3px">⬣ ${site.primaryMineral} deposit</div>
+              <div style="font-size:10px;color:#9aa0a6">${site.name} · ${site.depthMeters}m below surface</div>
             </div>`
         }}
         
