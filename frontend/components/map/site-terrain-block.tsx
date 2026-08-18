@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html, Cloud, ContactShadows } from '@react-three/drei'
+import { OrbitControls, Html, Cloud, ContactShadows, GizmoHelper, GizmoViewport } from '@react-three/drei'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { DetectionSite } from '@/lib/mdmis-data'
 import { MINERAL_HEX, getResolvedTerrainConfig } from '@/lib/site-terrain'
 import { fbm2D, hash2, seedFromString } from '@/lib/noise'
