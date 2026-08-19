@@ -380,8 +380,22 @@ function TerrainScene({ site, xray }: SceneProps) {
 
 export default function SiteTerrainBlock({ site, xray = false }: { site: DetectionSite; xray?: boolean }) {
   return (
-    <Canvas shadows camera={{ position: [20, 15, 20], fov: 38 }} dpr={[1, 1.5]}>
-      <TerrainScene site={site} xray={xray} />
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas 
+        shadows 
+        camera={{ position: [20, 15, 20], fov: 38 }} 
+        dpr={[1, 1.5]}
+        gl={{ 
+          antialias: true,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: false,
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor('#0d0f12', 1)
+        }}
+      >
+        <TerrainScene site={site} xray={xray} />
+      </Canvas>
+    </div>
   )
 }
