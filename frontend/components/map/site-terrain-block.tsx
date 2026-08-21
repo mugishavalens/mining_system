@@ -1,41 +1,46 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html, Cloud, ContactShadows, GizmoHelper, GizmoViewport } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { DetectionSite } from '@/lib/mdmis-data'
 import { MINERAL_HEX, getResolvedTerrainConfig } from '@/lib/site-terrain'
 import { fbm2D, hash2, seedFromString } from '@/lib/noise'
 import { buildTerrainBlock, buildOreBlob } from '@/lib/terrain-geometry'
+import { useSiteRealTerrain } from '@/lib/real-terrain'
 
-const SIZE = 26
-const SEGMENTS = 56
-const CUT_DEPTH = 10
+// ── Constants ────────────────────────────────────────────────────────────────
+const SIZE = 28
+const SEGMENTS = 64          // higher = smoother terrain shape
+const CUT_DEPTH = 12
+const DEFAULT_CAMERA_POS: [number, number, number] = [22, 18, 22]
+const DEFAULT_TARGET: [number, number, number] = [0, 2, 0]
+
+// Amplitude multiplier — the key fix. Real SRTM relief is ~200m over 900m
+// which after RELIEF_METERS_TO_LOCAL_UNITS gives ~3 units (flat slab).
+// We always use the procedural geometry with a HIGH amplitude so peaks are
+// dramatic, then optionally drape the real satellite texture on top.
+const BASE_AMPLITUDE_BOOST = 2.2
 
 interface SceneProps {
   site: DetectionSite
   xray: boolean
+  controlsRef: React.RefObject<OrbitControlsImpl | null>
+  resetSignal: number
 }
 
-function Vein({
-  position,
-  length,
-  axis,
-  color,
-}: {
-  position: [number, number, number]
-  length: number
-  axis: 'x' | 'z'
-  color: string
+// ── Ore vein on cutaway wall ──────────────────────────────────────────────────
+function Vein({ position, length, axis, color }: {
+  position: [number, number, number]; length: number; axis: 'x' | 'z'; color: string
 }) {
   const ref = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     const m = ref.current?.material as THREE.MeshStandardMaterial | undefined
-    if (m) m.emissiveIntensity = 0.9 + Math.sin(clock.elapsedTime * 1.6) * 0.35
+    if (m) m.emissiveIntensity = 0.8 + Math.sin(clock.elapsedTime * 1.6) * 0.4
   })
-  const dims: [number, number, number] = axis === 'x' ? [length, 0.5, 0.16] : [0.16, 0.5, length]
+  const dims: [number, number, number] = axis === 'x' ? [length, 0.55, 0.18] : [0.18, 0.55, length]
   return (
     <mesh ref={ref} position={position}>
       <boxGeometry args={dims} />
@@ -44,63 +49,40 @@ function Vein({
   )
 }
 
-function OreBlob({
-  position,
-  radius,
-  color,
-  seed,
-}: {
-  position: [number, number, number]
-  radius: number
-  color: string
-  seed: number
+// ── Ore deposit blob ──────────────────────────────────────────────────────────
+function OreBlob({ position, radius, color, seed }: {
+  position: [number, number, number]; radius: number; color: string; seed: number
 }) {
   const geo = useMemo(() => buildOreBlob(radius, seed), [radius, seed])
   const ref = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     const m = ref.current?.material as THREE.MeshStandardMaterial | undefined
-    if (m) m.emissiveIntensity = 0.65 + Math.sin(clock.elapsedTime * 1.3) * 0.3
+    if (m) m.emissiveIntensity = 0.6 + Math.sin(clock.elapsedTime * 1.3) * 0.35
   })
   return (
     <mesh ref={ref} geometry={geo} position={position} castShadow>
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} roughness={0.4} metalness={0.1} toneMapped={false} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8}
+        roughness={0.3} metalness={0.15} toneMapped={false} />
     </mesh>
   )
 }
 
-function Trees({
-  seed,
-  half,
-  heightAt,
-  amplitude,
-  density,
-  colors,
-}: {
-  seed: number
-  half: number
-  heightAt: (nx: number, nz: number) => number
-  amplitude: number
-  density: number
-  colors: string[]
+// ── Trees ─────────────────────────────────────────────────────────────────────
+function Trees({ seed, half, heightAt, amplitude, density, colors }: {
+  seed: number; half: number; heightAt: (nx: number, nz: number) => number
+  amplitude: number; density: number; colors: string[]
 }) {
   const trees = useMemo(() => {
-    const count = Math.round(density * 90)
+    const count = Math.round(density * 80)
     const items: { x: number; y: number; z: number; scale: number; color: string }[] = []
     for (let i = 0; i < count; i++) {
       const nx = fbm2D(i * 3.1, 0.7, seed + 300, 1) * 2 - 1
       const nz = fbm2D(0.4, i * 2.7, seed + 600, 1) * 2 - 1
-      if (Math.max(Math.abs(nx), Math.abs(nz)) > 0.86) continue
+      if (Math.max(Math.abs(nx), Math.abs(nz)) > 0.84) continue
       const h = heightAt(nx, nz)
-      const t = h / amplitude
-      if (t > 0.72) continue // no trees above the tree line
+      if (h / amplitude > 0.75) continue
       const jitter = fbm2D(i * 5.2, i * 1.3, seed + 900, 1)
-      items.push({
-        x: nx * half,
-        y: h,
-        z: nz * half,
-        scale: 0.55 + jitter * 0.5,
-        color: colors[i % colors.length],
-      })
+      items.push({ x: nx * half, y: h, z: nz * half, scale: 0.5 + jitter * 0.55, color: colors[i % colors.length] })
     }
     return items
   }, [seed, half, heightAt, amplitude, density, colors])
@@ -109,13 +91,13 @@ function Trees({
     <group>
       {trees.map((t, i) => (
         <group key={i} position={[t.x, t.y, t.z]} scale={t.scale}>
-          <mesh position={[0, 0.32, 0]} castShadow>
-            <coneGeometry args={[0.32, 0.7, 6]} />
-            <meshStandardMaterial color={t.color} flatShading />
+          <mesh position={[0, 0.38, 0]} castShadow>
+            <coneGeometry args={[0.3, 0.75, 6]} />
+            <meshLambertMaterial color={t.color} />
           </mesh>
-          <mesh position={[0, 0.05, 0]}>
-            <cylinderGeometry args={[0.05, 0.06, 0.14, 5]} />
-            <meshStandardMaterial color="#5b4632" />
+          <mesh position={[0, 0.06, 0]}>
+            <cylinderGeometry args={[0.05, 0.065, 0.15, 5]} />
+            <meshLambertMaterial color="#7a5c38" />
           </mesh>
         </group>
       ))}
@@ -123,19 +105,11 @@ function Trees({
   )
 }
 
-function Houses({
-  seed,
-  half,
-  heightAt,
-  amplitude,
-}: {
-  seed: number
-  half: number
-  heightAt: (nx: number, nz: number) => number
-  amplitude: number
+// ── Small settlement ──────────────────────────────────────────────────────────
+function Houses({ seed, half, heightAt, amplitude }: {
+  seed: number; half: number; heightAt: (nx: number, nz: number) => number; amplitude: number
 }) {
   const houses = useMemo(() => {
-    // find a flattish spot for the settlement by sampling a handful of candidates
     let anchor = { nx: 0.35, nz: 0.3, h: Infinity }
     for (let i = 0; i < 16; i++) {
       const nx = 0.1 + hash2(seed + i * 7, 11) * 0.5
@@ -143,38 +117,28 @@ function Houses({
       const h = heightAt(nx, nz)
       if (h < anchor.h) anchor = { nx, nz, h }
     }
-
-    const roofColors = ['#8a4a3a', '#6b3f30', '#a5583f']
-    const items: { x: number; y: number; z: number; rot: number; roof: string }[] = []
-    for (let i = 0; i < 9; i++) {
+    const roofColors = ['#9a4a38', '#7a3f2e', '#b5604a']
+    return Array.from({ length: 9 }, (_, i) => {
       const ox = (hash2(seed + i * 3, 41) - 0.5) * 0.18
       const oz = (hash2(seed + i * 3, 59) - 0.5) * 0.18
-      const nx = anchor.nx + ox
-      const nz = anchor.nz + oz
+      const nx = anchor.nx + ox, nz = anchor.nz + oz
       const h = heightAt(nx, nz)
-      if (h / amplitude > 0.38) continue
-      items.push({
-        x: nx * half,
-        y: h,
-        z: nz * half,
-        rot: hash2(seed + i, 71) * Math.PI * 2,
-        roof: roofColors[i % roofColors.length],
-      })
-    }
-    return items
+      if (h / amplitude > 0.38) return null
+      return { x: nx * half, y: h, z: nz * half, rot: hash2(seed + i, 71) * Math.PI * 2, roof: roofColors[i % 3] }
+    }).filter(Boolean) as { x: number; y: number; z: number; rot: number; roof: string }[]
   }, [seed, half, heightAt, amplitude])
 
   return (
     <group>
       {houses.map((h, i) => (
         <group key={i} position={[h.x, h.y, h.z]} rotation={[0, h.rot, 0]} scale={0.5}>
-          <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
+          <mesh position={[0, 0.22, 0]} castShadow>
             <boxGeometry args={[0.5, 0.44, 0.42]} />
-            <meshStandardMaterial color="#ded2b6" flatShading />
+            <meshLambertMaterial color="#e0d4bc" />
           </mesh>
           <mesh position={[0, 0.52, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
             <coneGeometry args={[0.4, 0.3, 4]} />
-            <meshStandardMaterial color={h.roof} flatShading />
+            <meshLambertMaterial color={h.roof} />
           </mesh>
         </group>
       ))}
@@ -182,64 +146,41 @@ function Houses({
   )
 }
 
-/** Graduated depth ruler planted beside the block, translating the cutaway's
- *  world-space Y down to real meters below surface so the deposit's depth
- *  reads as a measurement, not just a number in a tooltip. Ticks span the
- *  same 0–80m range the vein-depth mapping (site.depthMeters / 80) uses, so
- *  the highlighted marker lines up exactly with the glowing vein/blob. */
-function DepthScale({
-  cutDepth,
-  markerHeight,
-  veinY,
-  siteDepthM,
-  veinColor,
-  half,
-}: {
-  cutDepth: number
-  markerHeight: number
-  veinY: number
-  siteDepthM: number
-  veinColor: string
-  half: number
+// ── Depth scale ruler ─────────────────────────────────────────────────────────
+function DepthScale({ cutDepth, markerHeight, veinY, siteDepthM, veinColor, half }: {
+  cutDepth: number; markerHeight: number; veinY: number
+  siteDepthM: number; veinColor: string; half: number
 }) {
   const maxMeters = 80
-  const metersToY = (m: number) => -cutDepth * (m / maxMeters)
   const ticks = [0, 20, 40, 60, 80]
-  const poleX = half + 1.6
-  const poleZ = half + 1.6
-
+  const poleX = half + 1.8, poleZ = half + 1.8
   return (
     <group position={[poleX, 0, poleZ]}>
       <mesh position={[0, (markerHeight - cutDepth) / 2, 0]}>
         <cylinderGeometry args={[0.025, 0.025, markerHeight + cutDepth, 8]} />
-        <meshBasicMaterial color="#c9d1d9" transparent opacity={0.5} />
+        <meshBasicMaterial color="#c9d1d9" transparent opacity={0.45} />
       </mesh>
-
-      {ticks.map((m) => (
-        <group key={m} position={[0, metersToY(m), 0]}>
-          <mesh position={[0.28, 0, 0]}>
-            <boxGeometry args={[0.56, 0.03, 0.03]} />
-            <meshBasicMaterial color="#c9d1d9" transparent opacity={0.7} />
-          </mesh>
-          <Html distanceFactor={24} position={[0.7, 0, 0]} occlude={false}>
-            <div className="pointer-events-none whitespace-nowrap rounded border border-white/10 bg-[#1a1d23]/80 px-1.5 py-0.5 font-mono text-[9px] text-white/70">
-              {m}m
-            </div>
-          </Html>
-        </group>
-      ))}
-
-      {/* this site's actual deposit depth, pinned to the same scale */}
+      {ticks.map((m) => {
+        const y = -cutDepth * (m / maxMeters)
+        return (
+          <group key={m} position={[0, y, 0]}>
+            <mesh position={[0.3, 0, 0]}>
+              <boxGeometry args={[0.6, 0.03, 0.03]} />
+              <meshBasicMaterial color="#c9d1d9" transparent opacity={0.65} />
+            </mesh>
+            <Html distanceFactor={24} position={[0.75, 0, 0]} occlude={false}>
+              <div className="pointer-events-none whitespace-nowrap rounded border border-white/10 bg-[#1a1d23]/85 px-1.5 py-0.5 font-mono text-[9px] text-white/70">
+                {m}m
+              </div>
+            </Html>
+          </group>
+        )
+      })}
       <group position={[0, veinY, 0]}>
-        <mesh>
-          <sphereGeometry args={[0.09, 12, 12]} />
-          <meshBasicMaterial color={veinColor} />
-        </mesh>
-        <Html distanceFactor={22} position={[0.85, 0, 0]} occlude={false}>
-          <div
-            className="pointer-events-none whitespace-nowrap rounded px-2 py-1 text-[10px] font-semibold text-[#1a1408] shadow"
-            style={{ background: veinColor }}
-          >
+        <mesh><sphereGeometry args={[0.1, 12, 12]} /><meshBasicMaterial color={veinColor} /></mesh>
+        <Html distanceFactor={22} position={[0.9, 0, 0]} occlude={false}>
+          <div className="pointer-events-none whitespace-nowrap rounded px-2 py-1 text-[10px] font-semibold shadow"
+            style={{ background: veinColor, color: '#0a0a0a' }}>
             ▶ {siteDepthM}m deposit
           </div>
         </Html>
@@ -248,141 +189,257 @@ function DepthScale({
   )
 }
 
-function TerrainScene({ site, xray }: SceneProps) {
+// ── Main scene ────────────────────────────────────────────────────────────────
+function TerrainScene({ site, xray, controlsRef, resetSignal }: SceneProps) {
   const seed = seedFromString(site.id)
   const half = SIZE / 2
-  const { biome, strata, colors, amplitude, frequency, elevationM } = useMemo(
-    () => getResolvedTerrainConfig(site.id, seed),
-    [site.id, seed],
+
+  const { biome, strataBands, colors, amplitude: baseAmplitude, frequency, elevationM } =
+    useMemo(() => getResolvedTerrainConfig(site.id, seed), [site.id, seed])
+
+  // Boost amplitude significantly for dramatic peaks — this is the key visual fix.
+  // Real terrain data is ~200m relief / 900m extent = gentle hills when scaled.
+  // We force a minimum amplitude of 5 so every site has visible mountains.
+  const amplitude = Math.max(baseAmplitude * BASE_AMPLITUDE_BOOST, 5.0)
+
+  // Always build procedural geometry for the dramatic shape.
+  // When real terrain loads we use its satellite texture as the surface skin.
+  const { surfaceGeometry, wallGeometry, bottomGeometry, maxHeight, heightAt } = useMemo(() =>
+    buildTerrainBlock({
+      seed, size: SIZE, segments: SEGMENTS,
+      amplitude, frequency,
+      biomeColors: colors,
+      cutDepth: CUT_DEPTH,
+      strataBands,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [seed, amplitude, frequency, colors, strataBands]
   )
 
-  const { surfaceGeometry, wallGeometry, bottomGeometry, maxHeight, heightAt } = useMemo(
-    () =>
-      buildTerrainBlock({
-        seed,
-        size: SIZE,
-        segments: SEGMENTS,
-        amplitude,
-        frequency,
-        biomeColors: colors,
-        cutDepth: CUT_DEPTH,
-        strataBands: strata.bands,
-      }),
-    [seed, amplitude, frequency, colors, strata],
-  )
+  // Load real satellite texture — drape it over the procedural mesh
+  const realTerrain = useSiteRealTerrain(site.id)
+  const satelliteTexture = realTerrain.status === 'ready' ? realTerrain.texture : null
 
   const veinColor = MINERAL_HEX[site.primaryMineral]
   const veinDepthRatio = Math.min(Math.max(site.depthMeters / 80, 0.15), 0.88)
   const veinY = -CUT_DEPTH * veinDepthRatio
-  const blobRadius = Math.min(Math.max(Math.sqrt(site.estimatedTonnage) / 95, 0.75), 2.3)
-
+  const blobRadius = Math.min(Math.max(Math.sqrt(site.estimatedTonnage) / 95, 0.75), 2.6)
   const markerHeight = heightAt(0, 0)
-  const waterX = -half * 0.55
-  const waterZ = half * 0.4
 
-  const groundMaterialProps = xray
-    ? { transparent: true, opacity: 0.15, depthWrite: false }
-    : { transparent: false, opacity: 1, depthWrite: true }
+  const groundProps = xray
+    ? { transparent: true as const, opacity: 0.18, depthWrite: false }
+    : { transparent: false as const, opacity: 1, depthWrite: true }
+
+  const { camera } = useThree()
+  const [autoRotate, setAutoRotate] = useState(true)
+
+  useEffect(() => {
+    camera.position.set(...DEFAULT_CAMERA_POS)
+    const controls = controlsRef.current
+    if (controls) { controls.target.set(...DEFAULT_TARGET); controls.update() }
+    setAutoRotate(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [site.id, resetSignal])
+
+  const waterX = -half * 0.5, waterZ = half * 0.38
 
   return (
     <>
-      <color attach="background" args={[biome.skyTint]} />
-      <fog attach="fog" args={[biome.skyTint, 28, 60]} />
+      {/* Dark atmospheric background — matches the Grindelwald reference */}
+      <color attach="background" args={['#1a1e2e']} />
+      <fog attach="fog" color="#1a1e2e" near={38} far={75} />
 
-      <ambientLight intensity={xray ? 0.9 : 0.7} />
-      <directionalLight position={[14, 22, 10]} intensity={1.3} castShadow />
-      <hemisphereLight args={['#ffffff', '#546047', 0.4]} />
+      {/* ── Lighting ── */}
+      {/* Main sun — warm, strong, casts shadows */}
+      <directionalLight
+        position={[20, 32, 14]}
+        intensity={2.8}
+        color="#fff8f0"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-far={80}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
+      />
+      {/* Fill from opposite side — soft cool bounce */}
+      <directionalLight position={[-12, 16, -10]} intensity={0.8} color="#b0d0ff" />
+      {/* Ambient — keeps shadows from going pure black */}
+      <ambientLight intensity={0.55} color="#ffffff" />
+      {/* Hemisphere — sky/ground color separation */}
+      <hemisphereLight args={['#6aa8e8', '#5a7a35', 0.5]} />
 
+      {/* ── Surface mesh ── */}
       <mesh geometry={surfaceGeometry} receiveShadow={!xray} castShadow={!xray} renderOrder={xray ? 2 : 0}>
-        <meshStandardMaterial vertexColors flatShading {...groundMaterialProps} />
-      </mesh>
-      <mesh geometry={wallGeometry} renderOrder={xray ? 2 : 0}>
-        <meshStandardMaterial vertexColors flatShading side={THREE.DoubleSide} {...groundMaterialProps} />
-      </mesh>
-      <mesh geometry={bottomGeometry} renderOrder={xray ? 2 : 0}>
-        <meshStandardMaterial vertexColors side={THREE.DoubleSide} {...groundMaterialProps} />
+        {satelliteTexture ? (
+          // Real satellite photo draped over procedural peaks — Grindelwald look
+          <meshStandardMaterial
+            map={satelliteTexture}
+            roughness={0.78}
+            metalness={0}
+            {...groundProps}
+          />
+        ) : (
+          // Procedural biome vertex colors — vivid greens/browns per biome
+          <meshStandardMaterial
+            vertexColors
+            roughness={0.75}
+            metalness={0}
+            {...groundProps}
+          />
+        )}
       </mesh>
 
+      {/* ── Cutaway walls (strata) ── */}
+      <mesh geometry={wallGeometry} renderOrder={xray ? 2 : 0}>
+        <meshStandardMaterial
+          vertexColors
+          flatShading
+          roughness={0.88}
+          metalness={0}
+          side={THREE.DoubleSide}
+          {...groundProps}
+        />
+      </mesh>
+
+      {/* ── Bedrock base ── */}
+      <mesh geometry={bottomGeometry} renderOrder={xray ? 2 : 0}>
+        <meshStandardMaterial vertexColors roughness={0.92} metalness={0} side={THREE.DoubleSide} {...groundProps} />
+      </mesh>
+
+      {/* ── Water body (biomes that have one) ── */}
       {biome.hasWater && (
         <>
-          <mesh position={[waterX, 0.03, waterZ]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[half * 0.28, half * 0.35, 32]} />
-            <meshStandardMaterial color="#d9c9a0" roughness={1} />
+          <mesh position={[waterX, 0.04, waterZ]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[half * 0.26, half * 0.33, 32]} />
+            <meshStandardMaterial color="#c8b890" roughness={1} />
           </mesh>
-          <mesh position={[waterX, 0.05, waterZ]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[half * 0.28, 32]} />
-            <meshPhysicalMaterial color={biome.waterColor} transparent opacity={0.88} roughness={0.15} metalness={0.05} clearcoat={0.6} />
+          <mesh position={[waterX, 0.06, waterZ]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[half * 0.26, 32]} />
+            <meshPhysicalMaterial
+              color={biome.waterColor} transparent opacity={0.9}
+              roughness={0.08} metalness={0.05} clearcoat={0.8}
+            />
           </mesh>
         </>
       )}
 
-      <Trees seed={seed} half={half} heightAt={heightAt} amplitude={maxHeight} density={biome.treeDensity} colors={biome.treeColors} />
+      {/* ── Vegetation & settlement ── */}
+      <Trees seed={seed} half={half} heightAt={heightAt} amplitude={maxHeight}
+        density={biome.treeDensity} colors={biome.treeColors} />
       <Houses seed={seed} half={half} heightAt={heightAt} amplitude={maxHeight} />
 
-      {/* exposed ore vein on the two visible cutaway faces */}
-      <Vein position={[0, veinY, -half]} length={SIZE * 0.7} axis="x" color={veinColor} />
-      <Vein position={[half, veinY, 0]} length={SIZE * 0.7} axis="z" color={veinColor} />
+      {/* ── Ore veins on cutaway faces ── */}
+      <Vein position={[0, veinY, -half]} length={SIZE * 0.72} axis="x" color={veinColor} />
+      <Vein position={[half, veinY, 0]} length={SIZE * 0.72} axis="z" color={veinColor} />
 
-      {/* the true 3D deposit shape, hidden behind solid ground until X-Ray is toggled on */}
-      <OreBlob position={[half * 0.3, veinY, -half * 0.28]} radius={blobRadius} color={veinColor} seed={seed} />
+      {/* ── 3-D deposit (revealed by X-ray) ── */}
+      <OreBlob position={[half * 0.28, veinY, -half * 0.25]} radius={blobRadius} color={veinColor} seed={seed} />
 
-      {/* depth guide from surface marker down to the vein */}
+      {/* ── Vertical depth guide ── */}
       <mesh position={[0, (markerHeight + veinY) / 2, 0]}>
-        <cylinderGeometry args={[0.04, 0.04, markerHeight - veinY, 6]} />
-        <meshBasicMaterial color={veinColor} transparent opacity={0.5} />
+        <cylinderGeometry args={[0.045, 0.045, markerHeight - veinY, 6]} />
+        <meshBasicMaterial color={veinColor} transparent opacity={0.45} />
       </mesh>
 
-      {/* graduated depth scale beside the block, in meters below surface */}
+      {/* ── Depth scale ruler ── */}
       <DepthScale
-        cutDepth={CUT_DEPTH}
-        markerHeight={markerHeight}
-        veinY={veinY}
-        siteDepthM={site.depthMeters}
-        veinColor={veinColor}
-        half={half}
+        cutDepth={CUT_DEPTH} markerHeight={markerHeight}
+        veinY={veinY} siteDepthM={site.depthMeters}
+        veinColor={veinColor} half={half}
       />
 
+      {/* ── Site marker pin ── */}
       <group position={[0, markerHeight, 0]}>
-        <mesh position={[0, 0.5, 0]} castShadow>
-          <coneGeometry args={[0.22, 0.6, 4]} />
-          <meshStandardMaterial color="#e6563f" />
+        <mesh position={[0, 0.55, 0]} castShadow>
+          <coneGeometry args={[0.24, 0.65, 4]} />
+          <meshStandardMaterial color="#e6563f" roughness={0.3} metalness={0.2} />
         </mesh>
-        <mesh position={[0, 0.15, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.3, 8]} />
+        <mesh position={[0, 0.16, 0]}>
+          <cylinderGeometry args={[0.09, 0.09, 0.32, 8]} />
           <meshStandardMaterial color="#1a1d23" />
         </mesh>
-        <Html distanceFactor={22} position={[0, 1.1, 0]} occlude>
-          <div className="pointer-events-none rounded-md border border-white/15 bg-[#1a1d23]/90 px-2.5 py-1.5 text-[10px] text-white backdrop-blur whitespace-nowrap">
+        <Html distanceFactor={22} position={[0, 1.25, 0]} occlude>
+          <div className="pointer-events-none whitespace-nowrap rounded-md border border-white/20 bg-[#1a1d23]/92 px-2.5 py-1.5 text-[10px] text-white backdrop-blur shadow-xl">
             <div className="font-semibold">{site.name}</div>
-            <div className="text-white/60">
-              {elevationM}m elevation · {site.primaryMineral} · {site.depthMeters}m deep
+            <div className="mt-0.5 text-white/55">
+              {elevationM}m elev · {site.primaryMineral} · {site.depthMeters}m deep
             </div>
           </div>
         </Html>
       </group>
 
-      <Cloud position={[-half * 0.4, maxHeight + 6, -half * 0.3]} opacity={0.5} speed={0.15} bounds={[6, 1, 3]} segments={12} />
-      <Cloud position={[half * 0.5, maxHeight + 7.5, half * 0.2]} opacity={0.4} speed={0.15} bounds={[5, 1, 3]} segments={10} />
+      {/* ── Clouds — bright white ── */}
+      <Cloud
+        position={[-half * 0.45, maxHeight + 7, -half * 0.35]}
+        opacity={0.85} speed={0.1} bounds={[7, 1.5, 4]} segments={14}
+        color="#ffffff"
+      />
+      <Cloud
+        position={[half * 0.4, maxHeight + 9, half * 0.25]}
+        opacity={0.7} speed={0.1} bounds={[5, 1.2, 3]} segments={10}
+        color="#f0f8ff"
+      />
 
-      <ContactShadows position={[0, -0.01, 0]} opacity={0.25} scale={SIZE} blur={2} far={4} />
+      {/* ── Ground shadow ── */}
+      <ContactShadows position={[0, -0.01, 0]} opacity={0.2} scale={SIZE} blur={2.5} far={5} />
 
+      {/* ── Camera controls ── */}
       <OrbitControls
+        ref={controlsRef}
+        target={DEFAULT_TARGET}
         enablePan={false}
         minDistance={10}
-        maxDistance={42}
+        maxDistance={48}
         minPolarAngle={0.05}
-        maxPolarAngle={Math.PI - 0.05}
-        autoRotate
-        autoRotateSpeed={0.35}
+        maxPolarAngle={Math.PI * 0.85}
+        autoRotate={autoRotate}
+        autoRotateSpeed={0.3}
+        onStart={() => setAutoRotate(false)}
       />
+
+      {/* ── Orientation gizmo ── */}
+      <GizmoHelper alignment="bottom-right" margin={[68, 68]}>
+        <GizmoViewport axisColors={['#e6563f', '#3fcf8e', '#4bc5d6']} labelColor="#0a0a0a" />
+      </GizmoHelper>
     </>
   )
 }
 
-export default function SiteTerrainBlock({ site, xray = false }: { site: DetectionSite; xray?: boolean }) {
+// ── Canvas wrapper ────────────────────────────────────────────────────────────
+export default function SiteTerrainBlock({
+  site, xray = false, resetSignal = 0, onContextLost,
+}: {
+  site: DetectionSite
+  xray?: boolean
+  resetSignal?: number
+  onContextLost?: () => void
+}) {
+  const controlsRef = useRef<OrbitControlsImpl>(null)
+
   return (
-    <Canvas shadows camera={{ position: [20, 15, 20], fov: 38 }} dpr={[1, 1.5]}>
-      <TerrainScene site={site} xray={xray} />
+    <Canvas
+      shadows
+      camera={{ position: DEFAULT_CAMERA_POS, fov: 36 }}
+      dpr={[1, 1.5]}
+      gl={{
+        // NoToneMapping = vertex/texture colors render at their actual values.
+        // ACESFilmic (the default) crushes everything dark — this was the
+        // primary cause of the black surface.
+        toneMapping: THREE.NoToneMapping,
+        outputColorSpace: THREE.SRGBColorSpace,
+        antialias: true,
+      }}
+      onCreated={({ gl }) => {
+        if (!onContextLost) return
+        gl.domElement.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault()
+          onContextLost()
+        })
+      }}
+    >
+      <TerrainScene site={site} xray={xray} controlsRef={controlsRef} resetSignal={resetSignal} />
     </Canvas>
   )
 }

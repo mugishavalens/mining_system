@@ -17,6 +17,7 @@
     "framer-motion": "^13.1.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.1",
+    "mapbox-gl": "3.9.4",
     "next": "16.3.0",
     "react": "^19",
     "react-dom": "^19",

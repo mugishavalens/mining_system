@@ -98,8 +98,8 @@ export function can(role: Role, permission: string): boolean {
 
 // Nav items visible per role
 export const ROLE_NAV: Record<Role, string[]> = {
-  system_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
-  mine_analyst: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance'],
-  geologist: ['/dashboard', '/map', '/scans', '/traceability'],
+  system_admin: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
+  mine_analyst: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability', '/transport', '/compliance'],
+  geologist: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability'],
   compliance_officer: ['/dashboard', '/compliance', '/traceability', '/transport', '/scans'],
 }
