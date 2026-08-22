@@ -35,78 +35,80 @@ export const BIOME_PRESETS: Record<BiomeId, BiomePreset> = {
     label: 'Northern volcanic highlands',
     amplitude: 3.2,
     frequency: 0.9,
-    colors: { low: '#4f7942', mid: '#7fa65c', high: '#b7c98f', peak: '#eef2e4' },
+    // Vivid Rwandan green — lush terraced hillsides, red-clay exposed soil
+    colors: { low: '#5a9e45', mid: '#4db848', high: '#a8d070', peak: '#e8f4d8' },
     hasWater: false,
-    waterColor: '#5b9bd5',
+    waterColor: '#4a9fd4',
     treeDensity: 0.55,
-    treeColors: ['#3f6b3a', '#5a8a4a'],
-    skyTint: '#dce9f0',
+    treeColors: ['#2d7a30', '#3d9040'],
+    // Bright daytime sky — no dark horizon
+    skyTint: '#b8d8f0',
   },
   westernRidge: {
     label: 'Congo-Nile divide ridge',
     amplitude: 4.0,
     frequency: 0.7,
-    colors: { low: '#5a6b4d', mid: '#8a9070', high: '#c7c2a8', peak: '#f4f2ea' },
+    colors: { low: '#6b8a50', mid: '#92aa62', high: '#ccd4a0', peak: '#f0eedf' },
     hasWater: false,
-    waterColor: '#5b9bd5',
+    waterColor: '#4a88c0',
     treeDensity: 0.3,
-    treeColors: ['#4a5c3d'],
-    skyTint: '#e2e6df',
+    treeColors: ['#3a6030', '#4a7840'],
+    skyTint: '#c4d8e8',
   },
   lakeside: {
     label: 'Lake Kivu shoreline hills',
     amplitude: 3.4,
     frequency: 0.85,
-    colors: { low: '#3f6b53', mid: '#6f9a5e', high: '#b9c9a0', peak: '#eef2e4' },
+    colors: { low: '#3a8858', mid: '#5aaa5e', high: '#a0cc80', peak: '#e2f0d0' },
     hasWater: true,
-    waterColor: '#3e7ea6',
+    waterColor: '#1a78c0',
     treeDensity: 0.45,
-    treeColors: ['#3a6144', '#57804a'],
-    skyTint: '#d9ecf2',
+    treeColors: ['#2a6840', '#40885a'],
+    skyTint: '#b0d8f0',
   },
   riftValleyFloor: {
     label: 'Ruzizi rift valley floor',
     amplitude: 1.1,
     frequency: 0.5,
-    colors: { low: '#8a9a3f', mid: '#b7b34a', high: '#d8cf8a', peak: '#f0ecd0' },
+    colors: { low: '#a0b840', mid: '#c8cc50', high: '#dfd890', peak: '#f4f0c8' },
     hasWater: true,
-    waterColor: '#4791a8',
+    waterColor: '#2888b0',
     treeDensity: 0.2,
-    treeColors: ['#7a8a3a'],
-    skyTint: '#f2ecd4',
+    treeColors: ['#88a030', '#a0b840'],
+    skyTint: '#f0e8c0',
   },
   centralHills: {
     label: 'Central thousand-hills plateau',
     amplitude: 2.6,
     frequency: 0.95,
-    colors: { low: '#548a4c', mid: '#82a85c', high: '#c3cf95', peak: '#eef2e4' },
+    colors: { low: '#5aaa48', mid: '#80c058', high: '#b8d880', peak: '#e8f4d0' },
     hasWater: false,
-    waterColor: '#5b9bd5',
+    waterColor: '#4890cc',
     treeDensity: 0.4,
-    treeColors: ['#3f6b3a', '#6a8f4a'],
-    skyTint: '#dfeadf',
+    treeColors: ['#2a7030', '#408848'],
+    skyTint: '#c0dce8',
   },
   easternSavanna: {
     label: 'Eastern savanna plains',
     amplitude: 0.9,
     frequency: 0.45,
-    colors: { low: '#b9a25a', mid: '#c9b876', high: '#dccf9c', peak: '#efe8c9' },
+    colors: { low: '#c8b050', mid: '#d8c870', high: '#e8dca0', peak: '#f5eec8' },
     hasWater: true,
-    waterColor: '#5a92a0',
+    waterColor: '#3890a8',
     treeDensity: 0.12,
-    treeColors: ['#7a7a3a'],
-    skyTint: '#f2e9c9',
+    treeColors: ['#908830', '#a8a040'],
+    skyTint: '#f0e4b0',
   },
   westernFoothill: {
     label: 'Western foothill / river wetland',
     amplitude: 2.2,
     frequency: 0.8,
-    colors: { low: '#4d7a52', mid: '#799d5c', high: '#bdcb98', peak: '#eef2e4' },
+    colors: { low: '#4a9858', mid: '#70b858', high: '#b0cc88', peak: '#e4f0d0' },
     hasWater: true,
-    waterColor: '#4a8a9a',
+    waterColor: '#2878a8',
     treeDensity: 0.5,
-    treeColors: ['#3d6b40', '#5c8a4d'],
-    skyTint: '#dce9df',
+    treeColors: ['#306838', '#409050'],
+    skyTint: '#c0dce0',
   },
 }
 
@@ -167,17 +169,21 @@ export interface SiteTerrainPreset {
   rockTone: RockToneId
 }
 
+// Rock tone is picked from each site's actual primary/secondary mineralogy
+// rather than assigned round-robin, so two sites only ever share a cutaway
+// palette when they share a real deposit type (e.g. the two wolframite
+// veins, or the two orogenic gold-quartz sites) — never by coincidence.
 export const SITE_TERRAIN: Record<string, SiteTerrainPreset> = {
-  'RW-RTG-01': { biome: 'northernHighlands', rockTone: 'paleQuartzite' },
-  'RW-GTB-02': { biome: 'westernFoothill', rockTone: 'mixedPegmatiteSchist' },
-  'RW-NYK-03': { biome: 'northernHighlands', rockTone: 'darkVeinMetasediment' },
-  'RW-GFW-04': { biome: 'westernRidge', rockTone: 'blackShale' },
-  'RW-RWK-05': { biome: 'easternSavanna', rockTone: 'orogenicQuartzVein' },
-  'RW-NMB-06': { biome: 'northernHighlands', rockTone: 'mixedPegmatiteSchist' },
-  'RW-BGR-07': { biome: 'riftValleyFloor', rockTone: 'brightPegmatite' },
-  'RW-MSH-08': { biome: 'centralHills', rockTone: 'mixedPegmatiteSchist' },
-  'RW-KRG-09': { biome: 'lakeside', rockTone: 'mixedPegmatiteSchist' },
-  'RW-RTS-10': { biome: 'westernRidge', rockTone: 'blackShale' },
+  'RW-RTG-01': { biome: 'northernHighlands', rockTone: 'paleQuartzite' }, // Cassiterite — quartzite tin-vein belt
+  'RW-GTB-02': { biome: 'westernFoothill', rockTone: 'brightPegmatite' }, // Coltan+Beryl — Gatumba's classic LCT pegmatite field
+  'RW-NYK-03': { biome: 'northernHighlands', rockTone: 'darkVeinMetasediment' }, // Wolframite veins
+  'RW-GFW-04': { biome: 'westernRidge', rockTone: 'darkVeinMetasediment' }, // Wolframite veins
+  'RW-RWK-05': { biome: 'easternSavanna', rockTone: 'orogenicQuartzVein' }, // Gold
+  'RW-NMB-06': { biome: 'northernHighlands', rockTone: 'mixedPegmatiteSchist' }, // Coltan — pegmatite dikes in schist
+  'RW-BGR-07': { biome: 'riftValleyFloor', rockTone: 'brightPegmatite' }, // Lithium+Beryl — LCT pegmatite
+  'RW-MSH-08': { biome: 'centralHills', rockTone: 'blackShale' }, // flagged/unstable — darker graphitic host reads as the outlier
+  'RW-KRG-09': { biome: 'lakeside', rockTone: 'mixedPegmatiteSchist' }, // Beryl — pegmatite/schist contact zone
+  'RW-RTS-10': { biome: 'westernRidge', rockTone: 'orogenicQuartzVein' }, // Gold
 }
 
 export function getSiteTerrain(siteId: string): SiteTerrainPreset {
@@ -289,6 +295,10 @@ function jitterHex(hex: string, seedNum: number, salt: number, hueRange = 10, li
 export interface ResolvedTerrainConfig {
   biome: BiomePreset
   strata: StrataPreset
+  /** strata.bands nudged by the same per-site jitter as the surface colors,
+   *  so two sites sharing a rockTone (e.g. the two wolframite veins) still
+   *  show a visibly different cutaway rather than identical hex bands. */
+  strataBands: string[]
   colors: BiomePreset['colors']
   amplitude: number
   frequency: number
@@ -315,12 +325,15 @@ export function getResolvedTerrainConfig(siteId: string, seedNum: number): Resol
     peak: jitterHex(biome.colors.peak, seedNum, 4),
   }
 
+  const strataBands = strata.bands.map((hex, i) => jitterHex(hex, seedNum, 20 + i, 8, 0.04))
+
   const amplitude = biome.amplitude * (0.5 + elevationFactor * 1.0)
   const frequency = biome.frequency * (0.85 + elevationFactor * 0.3)
 
   return {
     biome,
     strata,
+    strataBands,
     colors,
     amplitude,
     frequency,

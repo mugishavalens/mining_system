@@ -91,63 +91,27 @@ function heightField(nx: number, nz: number, seed: number, amplitude: number, fr
   return amplitude * (floor + combined * (1 - floor) * fade)
 }
 
+interface WallsAndBottomOptions {
+  seed: number
+  size: number
+  segments: number
+  cutDepth: number
+  strataBands: string[]
+}
+
 /**
- * Builds a "terrain block" — a noise-displaced surface with a few seeded
- * mountain peaks, whose perimeter is skirted straight down to a flat base,
- * with wall vertices striped in geological strata bands (by world Y).
- * Mirrors the sliced-earth diorama look: raised terrain on top, exposed
- * rock cross-section on the sides.
+ * Builds the perimeter walls (geological strata cutaway) and the flat
+ * bedrock bottom for a terrain block, from a precomputed height grid.
+ * Shared by both the procedural and real-elevation surface builders below —
+ * the cutaway sides are always the stylized, hand-tuned rock strata (no
+ * data source gives us real subsurface layering), only the surface on top
+ * differs between the two.
  */
-export function buildTerrainBlock(opts: TerrainBlockOptions): TerrainBlockResult {
-  const { seed, size, segments, amplitude, frequency, biomeColors, cutDepth, strataBands } = opts
+function buildWallsAndBottom(heights: number[][], opts: WallsAndBottomOptions) {
+  const { seed, size, segments, cutDepth, strataBands } = opts
   const half = size / 2
   const seg = segments
 
-  // --- top surface ---
-  const positions: number[] = []
-  const colors: number[] = []
-  const indices: number[] = []
-  const heights: number[][] = []
-
-  for (let j = 0; j <= seg; j++) {
-    const row: number[] = []
-    const nz = (j / seg) * 2 - 1
-    for (let i = 0; i <= seg; i++) {
-      const nx = (i / seg) * 2 - 1
-      const h = heightField(nx, nz, seed, amplitude, frequency)
-      row.push(h)
-      positions.push(nx * half, h, nz * half)
-
-      const t = clamp01(h / amplitude)
-      let col: [number, number, number]
-      if (t < 0.35) col = lerpColor(biomeColors.low, biomeColors.mid, t / 0.35)
-      else if (t < 0.7) col = lerpColor(biomeColors.mid, biomeColors.high, (t - 0.35) / 0.35)
-      else col = lerpColor(biomeColors.high, biomeColors.peak, (t - 0.7) / 0.3)
-
-      const patch = fbm2D(nx * 6 + 50, nz * 6 + 50, seed + 900, 2)
-      const mix = 0.12 * (patch - 0.5)
-      colors.push(clamp01(col[0] + mix), clamp01(col[1] + mix), clamp01(col[2] + mix))
-    }
-    heights.push(row)
-  }
-
-  for (let j = 0; j < seg; j++) {
-    for (let i = 0; i < seg; i++) {
-      const a = j * (seg + 1) + i
-      const b = a + 1
-      const c = a + (seg + 1)
-      const d = c + 1
-      indices.push(a, c, b, b, c, d)
-    }
-  }
-
-  const surfaceGeometry = new THREE.BufferGeometry()
-  surfaceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  surfaceGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-  surfaceGeometry.setIndex(indices)
-  surfaceGeometry.computeVertexNormals()
-
-  // --- perimeter walls (strata cutaway) ---
   const bottomY = -cutDepth
   const vertSegs = 10
   const bandSteps = 16
@@ -221,7 +185,6 @@ export function buildTerrainBlock(opts: TerrainBlockOptions): TerrainBlockResult
   wallGeometry.setIndex(wallIndices)
   wallGeometry.computeVertexNormals()
 
-  // --- bottom (bedrock) ---
   const bottomGeometry = new THREE.PlaneGeometry(size, size)
   bottomGeometry.rotateX(Math.PI / 2)
   bottomGeometry.translate(0, bottomY, 0)
@@ -231,7 +194,170 @@ export function buildTerrainBlock(opts: TerrainBlockOptions): TerrainBlockResult
   for (let i = 0; i < bcount; i++) bcolors.push(...bedrock)
   bottomGeometry.setAttribute('color', new THREE.Float32BufferAttribute(bcolors, 3))
 
+  return { wallGeometry, bottomGeometry }
+}
+
+/**
+ * Builds a "terrain block" — a noise-displaced surface with a few seeded
+ * mountain peaks, whose perimeter is skirted straight down to a flat base,
+ * with wall vertices striped in geological strata bands (by world Y).
+ * Mirrors the sliced-earth diorama look: raised terrain on top, exposed
+ * rock cross-section on the sides. Fallback used when a site has no real
+ * elevation/imagery data baked (see buildRealTerrainBlock below).
+ */
+export function buildTerrainBlock(opts: TerrainBlockOptions): TerrainBlockResult {
+  const { seed, size, segments, amplitude, frequency, biomeColors, cutDepth, strataBands } = opts
+  const half = size / 2
+  const seg = segments
+
+  // --- top surface ---
+  const positions: number[] = []
+  const colors: number[] = []
+  const indices: number[] = []
+  const heights: number[][] = []
+
+  for (let j = 0; j <= seg; j++) {
+    const row: number[] = []
+    const nz = (j / seg) * 2 - 1
+    for (let i = 0; i <= seg; i++) {
+      const nx = (i / seg) * 2 - 1
+      const h = heightField(nx, nz, seed, amplitude, frequency)
+      row.push(h)
+      positions.push(nx * half, h, nz * half)
+
+      const t = clamp01(h / amplitude)
+      let col: [number, number, number]
+      if (t < 0.35) col = lerpColor(biomeColors.low, biomeColors.mid, t / 0.35)
+      else if (t < 0.7) col = lerpColor(biomeColors.mid, biomeColors.high, (t - 0.35) / 0.35)
+      else col = lerpColor(biomeColors.high, biomeColors.peak, (t - 0.7) / 0.3)
+
+      const patch = fbm2D(nx * 6 + 50, nz * 6 + 50, seed + 900, 2)
+      const mix = 0.12 * (patch - 0.5)
+      colors.push(clamp01(col[0] + mix), clamp01(col[1] + mix), clamp01(col[2] + mix))
+    }
+    heights.push(row)
+  }
+
+  for (let j = 0; j < seg; j++) {
+    for (let i = 0; i < seg; i++) {
+      const a = j * (seg + 1) + i
+      const b = a + 1
+      const c = a + (seg + 1)
+      const d = c + 1
+      indices.push(a, c, b, b, c, d)
+    }
+  }
+
+  const surfaceGeometry = new THREE.BufferGeometry()
+  surfaceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  surfaceGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  surfaceGeometry.setIndex(indices)
+  surfaceGeometry.computeVertexNormals()
+
+  const { wallGeometry, bottomGeometry } = buildWallsAndBottom(heights, { seed, size, segments, cutDepth, strataBands })
+
   const heightAt = (nx: number, nz: number) => heightField(nx, nz, seed, amplitude, frequency)
+
+  return { surfaceGeometry, wallGeometry, bottomGeometry, maxHeight: amplitude, heightAt }
+}
+
+export interface RealTerrainBlockOptions {
+  seed: number
+  size: number
+  segments: number
+  cutDepth: number
+  strataBands: string[]
+  /** square grid of real elevation samples in meters, north row first
+   *  (row 0 = bbox.maxLat) — see scripts/fetch-terrain-data.mjs */
+  elevationGrid: number[][]
+  /** local-unit height of the grid's full real relief (max - min elevation) */
+  amplitude: number
+}
+
+function bilinearSample(grid: number[][], gx: number, gy: number): number {
+  const size = grid.length
+  const x0 = Math.max(0, Math.min(size - 1, Math.floor(gx)))
+  const x1 = Math.min(size - 1, x0 + 1)
+  const y0 = Math.max(0, Math.min(size - 1, Math.floor(gy)))
+  const y1 = Math.min(size - 1, y0 + 1)
+  const fx = gx - x0
+  const fy = gy - y0
+  const a = grid[y0][x0]
+  const b = grid[y0][x1]
+  const c = grid[y1][x0]
+  const d = grid[y1][x1]
+  return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy
+}
+
+/**
+ * Builds a terrain block from a real SRTM-derived elevation grid instead of
+ * procedural noise, with UVs so a real satellite-imagery texture can be
+ * draped on top. Grid convention: row 0 is the northernmost sample row,
+ * column 0 the westernmost — matching the file's own north(-Z)/west(-X)
+ * wall-naming convention (see buildWallsAndBottom), so `nz` maps to
+ * latitude and `nx` to longitude without any extra flip.
+ */
+export function buildRealTerrainBlock(opts: RealTerrainBlockOptions): TerrainBlockResult {
+  const { seed, size, segments, cutDepth, strataBands, elevationGrid, amplitude } = opts
+  const half = size / 2
+  const seg = segments
+  const gridSize = elevationGrid.length
+
+  let minElev = Infinity
+  let maxElev = -Infinity
+  for (const row of elevationGrid) {
+    for (const v of row) {
+      if (v < minElev) minElev = v
+      if (v > maxElev) maxElev = v
+    }
+  }
+  const relief = maxElev - minElev || 1
+
+  const heightAt = (nx: number, nz: number) => {
+    const gx = ((nx + 1) / 2) * (gridSize - 1)
+    const gy = (1 - (nz + 1) / 2) * (gridSize - 1)
+    const raw = bilinearSample(elevationGrid, gx, gy)
+    return ((raw - minElev) / relief) * amplitude
+  }
+
+  const positions: number[] = []
+  const uvs: number[] = []
+  const indices: number[] = []
+  const heights: number[][] = []
+
+  for (let j = 0; j <= seg; j++) {
+    const row: number[] = []
+    const nz = (j / seg) * 2 - 1
+    for (let i = 0; i <= seg; i++) {
+      const nx = (i / seg) * 2 - 1
+      const h = heightAt(nx, nz)
+      row.push(h)
+      positions.push(nx * half, h, nz * half)
+      // v follows the same north(-Z)->south(+Z) mapping as heightAt, and
+      // relies on three.js's default texture.flipY so v=1 (top of UV
+      // space) samples row 0 (north) of the composited satellite canvas.
+      uvs.push((nx + 1) / 2, 1 - (nz + 1) / 2)
+    }
+    heights.push(row)
+  }
+
+  for (let j = 0; j < seg; j++) {
+    for (let i = 0; i < seg; i++) {
+      const a = j * (seg + 1) + i
+      const b = a + 1
+      const c = a + (seg + 1)
+      const d = c + 1
+      indices.push(a, c, b, b, c, d)
+    }
+  }
+
+  const surfaceGeometry = new THREE.BufferGeometry()
+  surfaceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  surfaceGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  surfaceGeometry.setIndex(indices)
+  surfaceGeometry.computeVertexNormals()
+
+  const { wallGeometry, bottomGeometry } = buildWallsAndBottom(heights, { seed, size, segments, cutDepth, strataBands })
 
   return { surfaceGeometry, wallGeometry, bottomGeometry, maxHeight: amplitude, heightAt }
 }

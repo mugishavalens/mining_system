@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Globe2, ScanLine, Link2, Truck,
-  ShieldCheck, Mountain, Radio, LogOut, Sun, Moon, Settings,
+  ShieldCheck, Mountain, Radio, LogOut, Sun, Moon, Settings, Satellite,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/shell/theme-provider'
@@ -13,6 +13,7 @@ import { ROLE_NAV } from '@/lib/rbac'
 
 const ALL_NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/map/globe', label: 'Satellite Globe', icon: Satellite },
   { href: '/map', label: 'Subsurface Explorer', icon: Globe2 },
   { href: '/scans', label: 'Survey Analysis', icon: ScanLine },
   { href: '/traceability', label: 'Chain of Custody', icon: Link2 },
@@ -67,7 +68,19 @@ export function Sidebar() {
           Operations
         </p>
         {nav.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          // /map/globe and /map/inspect/* must not highlight the /map entry,
+        // and /map must not highlight /map/globe — so we do an exact match
+        // first, then a prefix match that requires a '/' continuation AND
+        // that no other nav item is a more-specific prefix.
+        const isExact = pathname === item.href
+        const isPrefix = pathname.startsWith(item.href + '/') &&
+          !ALL_NAV.some(
+            (other) =>
+              other.href !== item.href &&
+              other.href.length > item.href.length &&
+              pathname.startsWith(other.href),
+          )
+        const active = isExact || isPrefix
           const Icon = item.icon
           return (
             <Link key={item.href} href={item.href}

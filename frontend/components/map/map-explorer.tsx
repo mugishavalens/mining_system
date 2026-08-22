@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { Loader2, MapPin, Layers, Gauge, ShieldAlert, Boxes, Drill, Eye, Mountain, ArrowLeft, Scan, EyeOff } from 'lucide-react'
+import { Loader2, MapPin, Layers, Gauge, ShieldAlert, Boxes, Drill, Eye, Mountain, ArrowLeft, Scan, EyeOff, RotateCcw } from 'lucide-react'
 import {
   SITES,
   RISK_META,
@@ -15,6 +15,7 @@ import { StatusPill } from '@/components/shell/status-pill'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Map3DErrorBoundary } from '@/components/map/map-3d-boundary'
 
 const GlobeScene = dynamic(() => import('@/components/map/globe-scene'), {
   ssr: false,
@@ -45,6 +46,8 @@ export function MapExplorer() {
   const [showUnderground, setShowUnderground] = useState(true)
   const [viewMode, setViewMode] = useState<'globe' | 'terrain'>('globe')
   const [xray, setXray] = useState(false)
+  const [resetSignal, setResetSignal] = useState(0)
+  const [mapKey, setMapKey] = useState(0)
   const selected = SITES.find((s) => s.id === selectedId) ?? null
 
   function selectSite(id: string) {
@@ -70,11 +73,28 @@ export function MapExplorer() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
         <div className="absolute inset-0 grid-backdrop opacity-30" />
         <div className="relative h-full w-full" key={viewMode}>
-          {viewMode === 'terrain' && selected ? (
-            <SiteTerrainBlock site={selected} xray={xray} />
-          ) : (
-            <GlobeScene selectedId={selectedId} onSelect={(s) => selectSite(s.id)} showUnderground={showUnderground} />
-          )}
+          <Map3DErrorBoundary
+            label={viewMode === 'terrain' ? '3D terrain view' : '3D subsurface globe'}
+            onRetry={() => setMapKey((k) => k + 1)}
+          >
+            {viewMode === 'terrain' && selected ? (
+              <SiteTerrainBlock
+                key={mapKey}
+                site={selected}
+                xray={xray}
+                resetSignal={resetSignal}
+                onContextLost={() => setMapKey((k) => k + 1)}
+              />
+            ) : (
+              <GlobeScene
+                key={mapKey}
+                selectedId={selectedId}
+                onSelect={(s) => selectSite(s.id)}
+                showUnderground={showUnderground}
+                onContextLost={() => setMapKey((k) => k + 1)}
+              />
+            )}
+          </Map3DErrorBoundary>
         </div>
 
         {viewMode === 'globe' && (
@@ -107,7 +127,7 @@ export function MapExplorer() {
               variant={showUnderground ? 'default' : 'outline'}
               size="sm"
               onClick={() => setShowUnderground(!showUnderground)}
-              className="w-full justify-start gap-2 bg-card/85 dark:bg-card/85 backdrop-blur"
+              className={cn('w-full justify-start gap-2', !showUnderground && 'bg-card/85 dark:bg-card/85 backdrop-blur')}
             >
               {showUnderground ? <Eye className="size-3.5" /> : <Drill className="size-3.5" />}
               {showUnderground ? 'Viewing Subsurface' : 'Show Underground'}
@@ -145,10 +165,19 @@ export function MapExplorer() {
               variant={xray ? 'default' : 'outline'}
               size="sm"
               onClick={() => setXray(!xray)}
-              className="w-full justify-start gap-2 bg-card/85 dark:bg-card/85 backdrop-blur"
+              className={cn('w-full justify-start gap-2', !xray && 'bg-card/85 dark:bg-card/85 backdrop-blur')}
             >
               {xray ? <EyeOff className="size-3.5" /> : <Scan className="size-3.5" />}
               {xray ? 'Solid Ground' : 'X-Ray: See Through Ground'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setResetSignal((n) => n + 1)}
+              className="w-full justify-start gap-2 bg-card/85 dark:bg-card/85 backdrop-blur"
+            >
+              <RotateCcw className="size-3.5" />
+              Reset View
             </Button>
           </div>
         )}

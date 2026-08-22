@@ -21,9 +21,12 @@ interface Props {
   selectedId: string | null
   onSelect: (site: DetectionSite) => void
   showUnderground: boolean
+  /** Called if the WebGL context is lost (GPU reset, too many contexts,
+   *  driver issue) so the parent can force a clean remount. */
+  onContextLost?: () => void
 }
 
-export default function GlobeScene({ selectedId, onSelect, showUnderground }: Props) {
+export default function GlobeScene({ selectedId, onSelect, showUnderground, onContextLost }: Props) {
   const globeRef = useRef<GlobeMethods | undefined>(undefined)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 800, h: 600 })
@@ -55,6 +58,20 @@ export default function GlobeScene({ selectedId, onSelect, showUnderground }: Pr
     setSize({ w: el.clientWidth, h: el.clientHeight })
     return () => ro.disconnect()
   }, [])
+
+  // Recover from a lost WebGL context (e.g. GPU driver reset, or the
+  // browser reclaiming a context under memory pressure) instead of leaving
+  // the globe permanently blank.
+  useEffect(() => {
+    if (!ready || !globeRef.current || !onContextLost) return
+    const canvas = globeRef.current.renderer().domElement
+    const handleLost = (e: Event) => {
+      e.preventDefault()
+      onContextLost()
+    }
+    canvas.addEventListener('webglcontextlost', handleLost)
+    return () => canvas.removeEventListener('webglcontextlost', handleLost)
+  }, [ready, onContextLost])
 
   // initial camera: center on Rwanda / East Africa
   useEffect(() => {
