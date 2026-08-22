@@ -59,29 +59,43 @@ export function MapExplorer() {
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_360px]">
       {/* 3D canvas: global overview or per-site terrain block */}
-      <div className="relative min-h-[420px] overflow-hidden bg-[oklch(0.13_0.01_250)] grid-backdrop">
-        <Map3DErrorBoundary
-          label={viewMode === 'terrain' ? '3D terrain view' : '3D subsurface globe'}
-          onRetry={() => setMapKey((k) => k + 1)}
+      <div className="relative min-h-[420px] overflow-hidden bg-[oklch(0.13_0.01_250)]">
+        {/* Fixed Video Background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover opacity-20"
         >
-          {viewMode === 'terrain' && selected ? (
-            <SiteTerrainBlock
-              key={mapKey}
-              site={selected}
-              xray={xray}
-              resetSignal={resetSignal}
-              onContextLost={() => setMapKey((k) => k + 1)}
-            />
-          ) : (
-            <GlobeScene
-              key={mapKey}
-              selectedId={selectedId}
-              onSelect={(s) => selectSite(s.id)}
-              showUnderground={showUnderground}
-              onContextLost={() => setMapKey((k) => k + 1)}
-            />
-          )}
-        </Map3DErrorBoundary>
+          <source src="/videos/istockphoto-1689123730-640_adpp_is.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
+        <div className="absolute inset-0 grid-backdrop opacity-30" />
+        <div className="relative h-full w-full" key={viewMode}>
+          <Map3DErrorBoundary
+            label={viewMode === 'terrain' ? '3D terrain view' : '3D subsurface globe'}
+            onRetry={() => setMapKey((k) => k + 1)}
+          >
+            {viewMode === 'terrain' && selected ? (
+              <SiteTerrainBlock
+                key={mapKey}
+                site={selected}
+                xray={xray}
+                resetSignal={resetSignal}
+                onContextLost={() => setMapKey((k) => k + 1)}
+              />
+            ) : (
+              <GlobeScene
+                key={mapKey}
+                selectedId={selectedId}
+                onSelect={(s) => selectSite(s.id)}
+                showUnderground={showUnderground}
+                onContextLost={() => setMapKey((k) => k + 1)}
+              />
+            )}
+          </Map3DErrorBoundary>
+        </div>
 
         {viewMode === 'globe' && (
           <div className="pointer-events-auto absolute left-4 top-4 space-y-3">
