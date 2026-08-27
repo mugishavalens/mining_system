@@ -97,10 +97,10 @@ export function CesiumExplorer() {
   const handleVisible = useCallback((ids: string[]) => setVisibleIds(ids), [])
 
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_360px]">
+    <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_320px]">
 
       {/* ── Globe ────────────────────────────────────────────────────────── */}
-      <div className="relative min-h-[420px] overflow-hidden bg-[#05080f]">
+      <div className="relative flex-1 overflow-hidden bg-[#05080f]">
         <Map3DErrorBoundary label="3D globe" onRetry={() => setGlobeKey((k) => k + 1)}>
           <CesiumGlobe
             key={globeKey}

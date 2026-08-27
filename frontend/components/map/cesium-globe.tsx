@@ -248,10 +248,22 @@ export default function CesiumGlobe({
   }, [selectedId])
 
   return (
-    <div className="relative h-full w-full bg-[#05080f]">
-      <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+    <div className="relative h-full w-full overflow-hidden bg-[#05080f]">
+      <div ref={containerRef} className="h-full w-full" />
 
       <style>{`
+        #cesium-container {
+          width: 100%;
+          height: 100%;
+          position: relative;
+        }
+        .cesium-widget {
+          width: 100% !important;
+          height: 100% !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+        }
         .cesium-widget-credits {
           bottom: 4px !important;
           right: 8px !important;
