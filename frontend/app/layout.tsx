@@ -17,6 +17,10 @@ export const viewport: Viewport = { themeColor: '#0f1115' }
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <head>
+        {/* Load Cesium.js globally — needed for the CesiumGlobe component */}
+        <script src="/cesium/Cesium.js" async defer />
+      </head>
       <body className="font-sans antialiased">
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
