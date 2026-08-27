@@ -419,27 +419,32 @@ export default function SiteTerrainBlock({
   const controlsRef = useRef<OrbitControlsImpl>(null)
 
   return (
-    <Canvas
-      shadows
-      camera={{ position: DEFAULT_CAMERA_POS, fov: 36 }}
-      dpr={[1, 1.5]}
-      gl={{
-        // NoToneMapping = vertex/texture colors render at their actual values.
-        // ACESFilmic (the default) crushes everything dark — this was the
-        // primary cause of the black surface.
-        toneMapping: THREE.NoToneMapping,
-        outputColorSpace: THREE.SRGBColorSpace,
-        antialias: true,
-      }}
-      onCreated={({ gl }) => {
-        if (!onContextLost) return
-        gl.domElement.addEventListener('webglcontextlost', (e) => {
-          e.preventDefault()
-          onContextLost()
-        })
-      }}
-    >
-      <TerrainScene site={site} xray={xray} controlsRef={controlsRef} resetSignal={resetSignal} />
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas
+        shadows
+        camera={{ position: DEFAULT_CAMERA_POS, fov: 36 }}
+        dpr={[1, 1.5]}
+        gl={{
+          // NoToneMapping = vertex/texture colors render at their actual values.
+          // ACESFilmic (the default) crushes everything dark — this was the
+          // primary cause of the black surface.
+          toneMapping: THREE.NoToneMapping,
+          outputColorSpace: THREE.SRGBColorSpace,
+          antialias: true,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: false,
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor('#0d0f12', 1)
+          if (!onContextLost) return
+          gl.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault()
+            onContextLost()
+          })
+        }}
+      >
+        <TerrainScene site={site} xray={xray} controlsRef={controlsRef} resetSignal={resetSignal} />
+      </Canvas>
+    </div>
   )
 }

@@ -34,6 +34,20 @@ export default function GlobeScene({ selectedId, onSelect, showUnderground, onCo
 
   const colors = GLOBE_COLORS
 
+  // Cleanup on unmount to prevent WebGL context loss
+  useEffect(() => {
+    return () => {
+      if (globeRef.current) {
+        const gl = (globeRef.current as any)._renderer?.domElement?.getContext?.('webgl2') || 
+                   (globeRef.current as any)._renderer?.domElement?.getContext?.('webgl')
+        if (gl && typeof gl.getExtension === 'function') {
+          const loseContext = gl.getExtension('WEBGL_lose_context')
+          if (loseContext) loseContext.loseContext()
+        }
+      }
+    }
+  }, [])
+
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
