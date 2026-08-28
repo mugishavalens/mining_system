@@ -320,12 +320,19 @@ export function MapboxExplorer() {
             listSites.map((s) => {
               const active = s.id === selectedId
               return (
-                <button
+                <div
                   key={s.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelect(s)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleSelect(s)
+                    }
+                  }}
                   className={cn(
-                    'mb-1 flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors',
+                    'mb-1 flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors cursor-pointer select-none',
                     active
                       ? 'border-primary/40 bg-primary/8'
                       : 'border-transparent hover:border-border hover:bg-secondary/50',
@@ -359,7 +366,7 @@ export function MapboxExplorer() {
                       <Scan className="size-3 text-primary" />
                     </button>
                   )}
-                </button>
+                </div>
               )
             })
           )}

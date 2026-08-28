@@ -97,10 +97,10 @@ export function CesiumExplorer() {
   const handleVisible = useCallback((ids: string[]) => setVisibleIds(ids), [])
 
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_320px]">
+    <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[1fr_320px] lg:grid-rows-1 lg:grid-cols-[1fr_340px]">
 
       {/* ── Globe ────────────────────────────────────────────────────────── */}
-      <div className="relative flex-1 overflow-hidden bg-[#05080f]">
+      <div className="relative h-full min-h-[380px] overflow-hidden bg-[#05080f]">
         <Map3DErrorBoundary label="3D globe" onRetry={() => setGlobeKey((k) => k + 1)}>
           <CesiumGlobe
             key={globeKey}
@@ -278,9 +278,19 @@ export function CesiumExplorer() {
           ) : listSites.map((s) => {
             const active = s.id === selectedId
             return (
-              <button key={s.id} type="button" onClick={() => handleSelect(s)}
+              <div
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleSelect(s)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleSelect(s)
+                  }
+                }}
                 className={cn(
-                  'mb-1 flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors',
+                  'mb-1 flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors cursor-pointer select-none',
                   active ? 'border-primary/40 bg-primary/8' : 'border-transparent hover:border-border hover:bg-secondary/50',
                 )}
               >
@@ -307,7 +317,7 @@ export function CesiumExplorer() {
                     <Scan className="size-3 text-primary" />
                   </button>
                 )}
-              </button>
+              </div>
             )
           })}
         </div>

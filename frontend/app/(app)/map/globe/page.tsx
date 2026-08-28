@@ -8,7 +8,7 @@ export default function GlobeMapPage() {
         title="3D Satellite Globe"
         subtitle="Cesium World Terrain · Bing satellite imagery · real elevation worldwide · click a site to explore"
       />
-      <div className="flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <CesiumExplorer />
       </div>
     </>
