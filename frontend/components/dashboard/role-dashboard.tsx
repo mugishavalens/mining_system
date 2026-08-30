@@ -1,10 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { BarChart3, Globe2, ShieldCheck, Shield, ArrowRight, MapPin, ScanLine, Link2, Truck, FileCheck2, Users, Settings } from 'lucide-react'
+import { BarChart3, Globe2, ShieldCheck, Shield, ArrowRight, MapPin, ScanLine, Link2, Truck, FileCheck2, Users, Settings, Radio, HardHat, Gavel, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import type { Role } from '@/lib/rbac'
 
-const ROLE_CONFIG = {
+const ROLE_CONFIG: Record<Role, {
+  icon: React.ElementType
+  color: string
+  bg: string
+  greeting: string
+  desc: string
+  quickLinks: { href: string; label: string; icon: React.ElementType }[]
+}> = {
   system_admin: {
     icon: Shield,
     color: 'text-destructive',
@@ -18,11 +26,24 @@ const ROLE_CONFIG = {
       { href: '/compliance', label: 'Compliance Reports', icon: ShieldCheck },
     ],
   },
-  mine_analyst: {
+  company_admin: {
+    icon: Shield,
+    color: 'text-destructive',
+    bg: 'bg-destructive/10 border-destructive/20',
+    greeting: 'Company Admin Portal',
+    desc: 'Manage your organisation’s users and sites, review the org-wide audit trail and configure notifications.',
+    quickLinks: [
+      { href: '/admin', label: 'User Management', icon: Users },
+      { href: '/admin', label: 'Audit Logs', icon: FileCheck2 },
+      { href: '/map', label: 'Site Overview', icon: MapPin },
+      { href: '/compliance', label: 'Compliance Reports', icon: ShieldCheck },
+    ],
+  },
+  mine_manager: {
     icon: BarChart3,
     color: 'text-primary',
     bg: 'bg-primary/10 border-primary/20',
-    greeting: 'Mine Analyst Portal',
+    greeting: 'Mine Manager Portal',
     desc: 'View detection sites, run AI classifications, export scan reports and monitor supply-chain compliance status.',
     quickLinks: [
       { href: '/scans', label: 'AI Scan Analysis', icon: ScanLine },
@@ -44,11 +65,11 @@ const ROLE_CONFIG = {
       { href: '/map', label: 'Annotate Sites', icon: MapPin },
     ],
   },
-  compliance_officer: {
+  compliance_manager: {
     icon: ShieldCheck,
     color: 'text-[var(--success)]',
     bg: 'bg-[var(--success)]/10 border-[var(--success)]/20',
-    greeting: 'Compliance Officer Portal',
+    greeting: 'Compliance Manager Portal',
     desc: 'Manage OECD due diligence reports, ITSCI tag reconciliation, RMB licensing returns and flag non-compliant mineral lots.',
     quickLinks: [
       { href: '/compliance', label: 'OECD Reports', icon: ShieldCheck },
@@ -57,13 +78,68 @@ const ROLE_CONFIG = {
       { href: '/scans', label: 'Scan Records', icon: ScanLine },
     ],
   },
+  safety_officer: {
+    icon: HardHat,
+    color: 'text-[oklch(0.72_0.16_55)]',
+    bg: 'bg-[oklch(0.72_0.16_55)]/10 border-[oklch(0.72_0.16_55)]/20',
+    greeting: 'Safety Officer Portal',
+    desc: 'Monitor real-time site risk scores, acknowledge safety incidents and review subsurface stability alerts.',
+    quickLinks: [
+      { href: '/map', label: 'Risk Scores', icon: ShieldCheck },
+      { href: '/map', label: '3D Subsurface View', icon: Globe2 },
+      { href: '/dashboard', label: 'Active Alerts', icon: Radio },
+    ],
+  },
+  government_auditor: {
+    icon: Gavel,
+    color: 'text-accent',
+    bg: 'bg-accent/10 border-accent/20',
+    greeting: 'Government Auditor Portal',
+    desc: 'Read-only access to compliance records, grading certificates and traceability reports for your area of concession.',
+    quickLinks: [
+      { href: '/compliance', label: 'Compliance Records', icon: ShieldCheck },
+      { href: '/traceability', label: 'Traceability Reports', icon: Link2 },
+      { href: '/scans', label: 'Grading Records', icon: ScanLine },
+    ],
+  },
+  investor: {
+    icon: TrendingUp,
+    color: 'text-primary',
+    bg: 'bg-primary/10 border-primary/20',
+    greeting: 'Investor Portal',
+    desc: 'Read-only view of resource estimates, production summaries and financial analytics for your authorised sites.',
+    quickLinks: [
+      { href: '/compliance', label: 'Production Summaries', icon: ShieldCheck },
+      { href: '/dashboard', label: 'Resource Estimates', icon: BarChart3 },
+    ],
+  },
+  field_operator: {
+    icon: Radio,
+    color: 'text-muted-foreground',
+    bg: 'bg-secondary/40 border-border',
+    greeting: 'Field Operator',
+    desc: 'Field data collection, batch tagging and safety event logging happen in the MDMIS Field App.',
+    quickLinks: [
+      { href: '/scans', label: 'Scan Records', icon: ScanLine },
+    ],
+  },
+  drone_operator: {
+    icon: Radio,
+    color: 'text-muted-foreground',
+    bg: 'bg-secondary/40 border-border',
+    greeting: 'Drone Operator',
+    desc: 'Flight log and hyperspectral file uploads happen in the MDMIS Field App. Upload status is visible here.',
+    quickLinks: [
+      { href: '/scans', label: 'Upload Status', icon: ScanLine },
+    ],
+  },
 }
 
 export function RoleDashboard() {
   const { user } = useAuth()
   if (!user) return null
 
-  const cfg = ROLE_CONFIG[user.role]
+  const cfg = ROLE_CONFIG[user.role as Role] ?? ROLE_CONFIG.field_operator
   const Icon = cfg.icon
 
   return (

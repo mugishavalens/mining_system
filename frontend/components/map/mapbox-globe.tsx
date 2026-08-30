@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
+import { KeyRound } from 'lucide-react'
 import { SITES, type DetectionSite } from '@/lib/mdmis-data'
 import { MINERAL_HEX } from '@/lib/site-terrain'
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+if (MAPBOX_TOKEN) mapboxgl.accessToken = MAPBOX_TOKEN
 
 const RISK_HEX: Record<DetectionSite['riskLevel'], string> = {
   low: '#3fcf8e',
@@ -70,7 +72,7 @@ export default function MapboxGlobe({ selectedId, onSelect, onInspect, onVisible
   useEffect(() => { modeRef.current = mode }, [mode])
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
+    if (!containerRef.current || mapRef.current || !MAPBOX_TOKEN) return
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -387,6 +389,23 @@ export default function MapboxGlobe({ selectedId, onSelect, onInspect, onVisible
 
   function setPitchTo(p: number) {
     mapRef.current?.easeTo({ pitch: p, duration: 500 })
+  }
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0a0d14] p-8 text-center">
+        <KeyRound className="size-8 text-muted-foreground" />
+        <div>
+          <p className="text-sm font-medium text-foreground">Mapbox token not configured</p>
+          <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+            The satellite globe needs a free Mapbox public token. Get one at{' '}
+            <span className="text-foreground">mapbox.com/account/access-tokens</span>, then add it to{' '}
+            <span className="font-mono text-foreground">frontend/.env.local</span> as{' '}
+            <span className="font-mono text-foreground">NEXT_PUBLIC_MAPBOX_TOKEN</span> and restart the dev server.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -5,8 +5,19 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mountain, Eye, EyeOff, ArrowRight, CheckCircle2, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { apiFetch, ApiError } from '@/lib/api'
 
-const ROLES = ['Mine Analyst', 'Geologist', 'Compliance Officer', 'System Admin']
+// system_admin is intentionally excluded — that role is platform-internal
+// and is never self-registerable (see backend/accounts/models.py).
+const ROLES = [
+  { value: 'company_admin', label: 'Company Admin' },
+  { value: 'mine_manager', label: 'Mine Manager' },
+  { value: 'geologist', label: 'Geologist' },
+  { value: 'safety_officer', label: 'Safety Officer' },
+  { value: 'compliance_manager', label: 'Compliance Manager' },
+  { value: 'government_auditor', label: 'Government Auditor' },
+  { value: 'investor', label: 'Investor' },
+]
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -25,9 +36,27 @@ export default function RegisterPage() {
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setError('')
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 1400))
-    setLoading(false)
-    setDone(true)
+    try {
+      await apiFetch(
+        '/auth/register/',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            full_name: form.name,
+            email: form.email,
+            password: form.password,
+            role: form.role,
+            organisation_name: form.organization,
+          }),
+        },
+        { auth: false },
+      )
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (done) {
@@ -221,7 +250,7 @@ export default function RegisterPage() {
                   className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-3.5 text-[15px] text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all hover:bg-secondary/80"
                 >
                   <option value="">Select role…</option>
-                  {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
 

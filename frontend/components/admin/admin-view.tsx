@@ -32,9 +32,15 @@ const SYSTEM_STATS = [
 
 const ROLE_COLOR: Record<string, string> = {
   system_admin: 'danger',
-  mine_analyst: 'warning',
+  company_admin: 'danger',
+  mine_manager: 'warning',
   geologist: 'info',
-  compliance_officer: 'success',
+  compliance_manager: 'success',
+  safety_officer: 'warning',
+  government_auditor: 'info',
+  investor: 'success',
+  field_operator: 'info',
+  drone_operator: 'info',
 }
 
 export function AdminView() {
