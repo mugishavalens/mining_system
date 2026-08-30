@@ -6,8 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Required for mapbox-gl to bundle correctly under Turbopack/webpack
   transpilePackages: ['mapbox-gl'],
+  turbopack: {},
 }
 
 export default nextConfig
