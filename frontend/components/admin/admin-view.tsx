@@ -1,18 +1,36 @@
 'use client'
 
-import { useState } from 'react'
-import { Shield, Users, Activity, Settings, CheckCircle2, XCircle, Clock, BarChart3, Eye, Trash2, UserCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Shield, Users, Activity, Settings, CheckCircle2, XCircle, Clock, BarChart3, Eye, Trash2, Send, Mail } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { StatusPill } from '@/components/shell/status-pill'
 import { RoleGuard } from '@/components/shell/role-guard'
-import { ROLE_USERS, PERMISSIONS } from '@/lib/rbac'
+import { PERMISSIONS, ROLE_THEME, type Role } from '@/lib/rbac'
+import { apiFetch, ApiError } from '@/lib/api'
 
-const MOCK_USERS = Object.values(ROLE_USERS).map((u, i) => ({
-  ...u,
-  status: i === 3 ? 'pending' : 'active',
-  lastLogin: i === 0 ? '2 min ago' : i === 1 ? '1h ago' : i === 2 ? '3h ago' : 'Never',
-  createdAt: '2026-01-15',
-}))
+interface OrgUser {
+  name: string
+  email: string
+  role: string
+  roleLabel: string
+  initials: string
+  isActive: boolean
+}
+
+interface Invitation {
+  id: string
+  email: string
+  role: string
+  status: string
+  expires_at: string
+  created_at: string
+}
+
+const INVITABLE_ROLES = [
+  { value: 'geologist', label: 'Geologist' },
+  { value: 'compliance_manager', label: 'Compliance Officer' },
+  { value: 'mine_manager', label: 'Mine Analyst' },
+]
 
 const AUDIT_LOGS = [
   { id: 1, user: 'D. Nzeyimana', action: 'Viewed scan SCN-24810', resource: 'Scans', time: '2 min ago', level: 'info' },
@@ -23,35 +41,85 @@ const AUDIT_LOGS = [
   { id: 6, user: 'System', action: 'Critical safety score at Musha Cassiterite', resource: 'Sites', time: '4h ago', level: 'danger' },
 ]
 
-const SYSTEM_STATS = [
-  { label: 'Total Users', value: '4', icon: Users, color: 'text-primary' },
-  { label: 'Active Sessions', value: '3', icon: Activity, color: 'text-accent' },
-  { label: 'Audit Events Today', value: '47', icon: Eye, color: 'text-[var(--success)]' },
-  { label: 'Pending Approvals', value: '1', icon: Clock, color: 'text-destructive' },
-]
-
-const ROLE_COLOR: Record<string, string> = {
-  system_admin: 'danger',
-  company_admin: 'danger',
-  mine_manager: 'warning',
-  geologist: 'info',
-  compliance_manager: 'success',
-  safety_officer: 'warning',
-  government_auditor: 'info',
-  investor: 'success',
-  field_operator: 'info',
-  drone_operator: 'info',
+function roleTone(role: string) {
+  return (role in ROLE_THEME ? ROLE_THEME[role as Role].tone : 'neutral')
 }
 
 export function AdminView() {
   const [activeTab, setActiveTab] = useState<'users' | 'audit' | 'permissions' | 'system'>('users')
+
+  const [users, setUsers] = useState<OrgUser[]>([])
+  const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState(INVITABLE_ROLES[0].value)
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSent, setInviteSent] = useState(false)
+
+  async function loadUsersAndInvites() {
+    setLoadingUsers(true)
+    try {
+      const [u, i] = await Promise.all([
+        apiFetch<OrgUser[]>('/accounts/users/'),
+        apiFetch<Invitation[]>('/accounts/invitations/'),
+      ])
+      setUsers(u)
+      setInvitations(i)
+    } catch {
+      // Non-org-admin viewers (e.g. a role without users.manage) simply see nothing.
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  useEffect(() => { loadUsersAndInvites() }, [])
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inviteEmail) { setInviteError('Enter an email address.'); return }
+    setInviteError('')
+    setInviting(true)
+    try {
+      await apiFetch('/accounts/invitations/', {
+        method: 'POST',
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      })
+      setInviteEmail('')
+      setInviteSent(true)
+      setTimeout(() => setInviteSent(false), 3000)
+      await loadUsersAndInvites()
+    } catch (err) {
+      setInviteError(err instanceof ApiError ? err.message : 'Could not send invitation.')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleRevoke(id: string) {
+    try {
+      await apiFetch(`/accounts/invitations/${id}`, { method: 'DELETE' })
+      setInvitations((prev) => prev.filter((inv) => inv.id !== id))
+    } catch {
+      // best-effort — the list will resync on next load
+    }
+  }
+
+  const pendingInvites = invitations.filter((i) => i.status === 'pending')
+  const systemStats = [
+    { label: 'Total Users', value: String(users.length), icon: Users, color: 'text-primary' },
+    { label: 'Pending Invitations', value: String(pendingInvites.length), icon: Clock, color: 'text-destructive' },
+    { label: 'Audit Events Today', value: '47', icon: Eye, color: 'text-[var(--success)]' },
+    { label: 'Active Sessions', value: '—', icon: Activity, color: 'text-accent' },
+  ]
 
   return (
     <RoleGuard permission="users.manage">
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {SYSTEM_STATS.map((s) => {
+          {systemStats.map((s) => {
             const Icon = s.icon
             return (
               <Card key={s.label} className="border-border bg-card">
@@ -81,43 +149,97 @@ export function AdminView() {
 
         {/* USER MANAGEMENT */}
         {activeTab === 'users' && (
-          <Card className="border-border bg-card">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm">Platform Users</CardTitle>
-                <CardDescription>Manage accounts, roles and access levels</CardDescription>
-              </div>
-              <button type="button" className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
-                <UserCheck className="size-3.5" /> Approve Request
-              </button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {MOCK_USERS.map((u) => (
-                <div key={u.email} className="flex items-center gap-4 rounded-lg border border-border bg-background/40 px-4 py-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                    {u.initials}
+          <div className="space-y-4">
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Invite a teammate</CardTitle>
+                <CardDescription>They'll get an email link to set their own password and sign in.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleInvite} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Work email</label>
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="teammate@organization.rw"
+                      className="w-full rounded-lg border border-border bg-secondary/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <div className="sm:w-52">
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Role</label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-secondary/60 px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      {INVITABLE_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
                   </div>
-                  <StatusPill tone={ROLE_COLOR[u.role] as 'danger' | 'warning' | 'info' | 'success'}>{u.roleLabel}</StatusPill>
-                  <div className="hidden md:block text-right">
-                    <p className="text-xs text-foreground">{u.status === 'active' ? 'Active' : 'Pending'}</p>
-                    <p className="text-[10px] text-muted-foreground">Last: {u.lastLogin}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {u.status === 'active'
+                  <button type="submit" disabled={inviting}
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors">
+                    <Send className="size-3.5" /> {inviting ? 'Sending…' : 'Send Invite'}
+                  </button>
+                </form>
+                {inviteError && <p className="mt-2 text-xs text-destructive">{inviteError}</p>}
+                {inviteSent && <p className="mt-2 text-xs text-[var(--success)]">Invitation sent.</p>}
+              </CardContent>
+            </Card>
+
+            {pendingInvites.length > 0 && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-sm">Pending invitations</CardTitle>
+                  <CardDescription>{pendingInvites.length} awaiting acceptance</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {pendingInvites.map((inv) => (
+                    <div key={inv.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-background/40 px-4 py-2.5">
+                      <Mail className="size-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground">{inv.email}</p>
+                        <p className="text-[10px] text-muted-foreground">Expires {new Date(inv.expires_at).toLocaleDateString()}</p>
+                      </div>
+                      <StatusPill tone={roleTone(inv.role)}>
+                        {INVITABLE_ROLES.find((r) => r.value === inv.role)?.label ?? inv.role}
+                      </StatusPill>
+                      <button type="button" onClick={() => handleRevoke(inv.id)} className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="text-sm">Organisation Members</CardTitle>
+                <CardDescription>{loadingUsers ? 'Loading…' : `${users.length} account${users.length === 1 ? '' : 's'}`}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {users.map((u) => (
+                  <div key={u.email} className="flex items-center gap-4 rounded-lg border border-border bg-background/40 px-4 py-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                      {u.initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">{u.name}</p>
+                      <p className="text-xs text-muted-foreground">{u.email}</p>
+                    </div>
+                    <StatusPill tone={roleTone(u.role)}>{u.roleLabel}</StatusPill>
+                    {u.isActive
                       ? <CheckCircle2 className="size-4 text-[var(--success)]" />
-                      : <Clock className="size-4 text-primary" />}
-                    <button type="button" className="ml-1 rounded p-1 text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="size-3.5" />
-                    </button>
+                      : <XCircle className="size-4 text-muted-foreground" />}
                   </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                ))}
+                {!loadingUsers && users.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">No organisation members yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* AUDIT LOGS */}
@@ -171,7 +293,7 @@ export function AdminView() {
         {activeTab === 'system' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { icon: Shield, title: 'JWT Token Expiry', value: '8 hours', desc: 'Session tokens expire after 8h of inactivity', color: 'text-primary' },
+              { icon: Shield, title: 'Session Length', value: '30 minutes', desc: 'Access tokens expire after 30 min; silent refresh keeps you signed in', color: 'text-primary' },
               { icon: Activity, title: 'Sensor Network', value: 'Online', desc: '12 UAV units · 34 ground nodes · Kigali hub', color: 'text-[var(--success)]' },
               { icon: BarChart3, title: 'AI Model Version', value: 'specnet-v4', desc: 'Last retrained: 2026-06-01 · 97.8% peak accuracy', color: 'text-accent' },
               { icon: Settings, title: 'Compliance Mode', value: 'OECD + ITSCI', desc: 'EU Conflict Minerals Reg. 2017/821 active', color: 'text-[var(--success)]' },
