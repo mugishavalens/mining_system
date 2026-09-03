@@ -53,13 +53,14 @@ export function can(role: Role, permission: string): boolean {
 // a given role always renders in the same color everywhere.
 export type RoleTone = 'danger' | 'warning' | 'info' | 'success' | 'accent'
 
-export const ROLE_THEME: Record<Role, { tone: RoleTone; text: string; bg: string }> = {
-  system_admin: { tone: 'danger', text: 'text-destructive', bg: 'bg-destructive/10 border-destructive/20' },
-  org_admin: { tone: 'accent', text: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-  mine_manager: { tone: 'warning', text: 'text-primary', bg: 'bg-primary/10 border-primary/20' },
-  geologist: { tone: 'info', text: 'text-accent', bg: 'bg-accent/10 border-accent/20' },
+export const ROLE_THEME: Record<Role, { tone: RoleTone; text: string; bg: string; solidBg: string }> = {
+  system_admin: { tone: 'danger', text: 'text-destructive', bg: 'bg-destructive/10 border-destructive/20', solidBg: 'bg-destructive' },
+  org_admin: { tone: 'accent', text: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', solidBg: 'bg-blue-500' },
+  mine_manager: { tone: 'warning', text: 'text-primary', bg: 'bg-primary/10 border-primary/20', solidBg: 'bg-primary' },
+  geologist: { tone: 'info', text: 'text-accent', bg: 'bg-accent/10 border-accent/20', solidBg: 'bg-accent' },
   compliance_manager: {
     tone: 'success', text: 'text-[var(--success)]', bg: 'bg-[var(--success)]/10 border-[var(--success)]/20',
+    solidBg: 'bg-[var(--success)]',
   },
 }
 
