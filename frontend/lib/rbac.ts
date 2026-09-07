@@ -64,11 +64,11 @@ export const ROLE_THEME: Record<Role, { tone: RoleTone; text: string; bg: string
   },
 }
 
-// Nav items visible per role.
+// Nav items visible per role - updated for unified map experience
 export const ROLE_NAV: Record<Role, string[]> = {
-  geologist: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability'],
-  mine_manager: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability', '/transport', '/compliance'],
+  geologist: ['/dashboard', '/map', '/scans', '/traceability'],
+  mine_manager: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance'],
   compliance_manager: ['/dashboard', '/compliance', '/traceability', '/transport', '/scans'],
-  org_admin: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
-  system_admin: ['/dashboard', '/map/globe', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
+  org_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
+  system_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
 }

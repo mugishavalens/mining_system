@@ -56,10 +56,10 @@ const ROLE_CONFIG: Record<Role, {
     desc: 'Explore 3D subsurface maps, annotate detection sites, analyze multi-sensor scan data and review geological survey results.',
     image: '/mine/excavator-aerial.png',
     quickLinks: [
-      { href: '/map', label: '3D Subsurface Explorer', icon: Globe2 },
+      { href: '/map', label: '3D Globe & Terrain', icon: Globe2 },
       { href: '/scans', label: 'Hyperspectral Scans', icon: ScanLine },
       { href: '/traceability', label: 'Site Traceability', icon: Link2 },
-      { href: '/map', label: 'Annotate Sites', icon: MapPin },
+      { href: '/compliance', label: 'Compliance Status', icon: ShieldCheck },
     ],
   },
   compliance_manager: {
