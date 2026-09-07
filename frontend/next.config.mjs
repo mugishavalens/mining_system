@@ -8,6 +8,7 @@ const nextConfig = {
   },
   transpilePackages: ['mapbox-gl'],
   turbopack: {},
+  allowedDevOrigins: ['172.27.112.1'],
 }
 
 export default nextConfig

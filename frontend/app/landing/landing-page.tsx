@@ -645,7 +645,7 @@ export function LandingPage() {
       </motion.nav>
 
       <section className="relative flex min-h-[100svh] items-center overflow-hidden px-5 pb-16 pt-28 text-white md:px-8">
-        <VideoLayer src={activeVideo} overlay={0.38} />
+        <VideoLayer src={videos.transport} overlay={0.38} />
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.05fr_.95fr]">
           <div className="max-w-3xl">
             <motion.h1

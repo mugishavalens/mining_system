@@ -1,7 +1,15 @@
-// MDMIS Role-Based Access Control definitions
-// Based on MDMIS SRS v2.0 and Auth/Authorization Design
+// MDMIS Role-Based Access Control definitions.
+// 5-role model: system_admin (platform), org_admin (per-organisation owner,
+// invites teammates), and the 3 invitable roles below. Role identity comes
+// from the FastAPI backend (see ../backend/app/accounts) via auth-context;
+// this file only maps a role slug to permissions/nav.
 
-export type Role = 'system_admin' | 'mine_analyst' | 'geologist' | 'compliance_officer'
+export type Role =
+  | 'geologist'
+  | 'compliance_manager'
+  | 'mine_manager'
+  | 'org_admin'
+  | 'system_admin'
 
 export interface RoleUser {
   name: string
@@ -11,84 +19,28 @@ export interface RoleUser {
   initials: string
 }
 
-// Map login email → user profile
-export const ROLE_USERS: Record<string, RoleUser> = {
-  'admin@mdmis.rw': {
-    name: 'A. Nkurunziza',
-    email: 'admin@mdmis.rw',
-    role: 'system_admin',
-    roleLabel: 'System Admin',
-    initials: 'AN',
-  },
-  'analyst@mdmis.rw': {
-    name: 'D. Nzeyimana',
-    email: 'analyst@mdmis.rw',
-    role: 'mine_analyst',
-    roleLabel: 'Mine Analyst',
-    initials: 'DN',
-  },
-  'geo@mdmis.rw': {
-    name: 'J. Habimana',
-    email: 'geo@mdmis.rw',
-    role: 'geologist',
-    roleLabel: 'Geologist',
-    initials: 'JH',
-  },
-  'compliance@mdmis.rw': {
-    name: 'C. Mukamana',
-    email: 'compliance@mdmis.rw',
-    role: 'compliance_officer',
-    roleLabel: 'Compliance Officer',
-    initials: 'CM',
-  },
-}
-
-// Permissions per role — based on MDMIS SRS functional requirements
+// Permissions per role.
 export const PERMISSIONS: Record<Role, string[]> = {
-  system_admin: [
-    'dashboard.view',
-    'dashboard.admin',
-    'map.view',
-    'map.edit',
-    'scans.view',
-    'scans.classify',
-    'scans.delete',
-    'traceability.view',
-    'traceability.edit',
-    'transport.view',
-    'transport.edit',
-    'compliance.view',
-    'compliance.submit',
-    'compliance.approve',
-    'users.manage',
-    'audit.view',
-    'system.configure',
-  ],
-  mine_analyst: [
-    'dashboard.view',
-    'map.view',
-    'scans.view',
-    'scans.classify',
-    'traceability.view',
-    'transport.view',
-    'compliance.view',
-  ],
   geologist: [
-    'dashboard.view',
-    'map.view',
-    'map.annotate',
-    'scans.view',
-    'scans.classify',
-    'traceability.view',
+    'dashboard.view', 'map.view', 'map.annotate', 'scans.view', 'scans.classify', 'traceability.view',
   ],
-  compliance_officer: [
-    'dashboard.view',
-    'compliance.view',
-    'compliance.submit',
-    'compliance.edit',
-    'traceability.view',
-    'transport.view',
-    'scans.view',
+  mine_manager: [
+    'dashboard.view', 'map.view', 'map.annotate', 'scans.view', 'scans.classify',
+    'traceability.view', 'traceability.edit', 'transport.view', 'compliance.view',
+  ],
+  compliance_manager: [
+    'dashboard.view', 'compliance.view', 'compliance.submit', 'compliance.edit',
+    'traceability.view', 'transport.view', 'scans.view',
+  ],
+  org_admin: [
+    'dashboard.view', 'dashboard.admin', 'map.view', 'map.annotate', 'scans.view', 'scans.classify',
+    'traceability.view', 'traceability.edit', 'transport.view', 'compliance.view', 'compliance.submit',
+    'users.manage', 'users.invite', 'audit.view',
+  ],
+  system_admin: [
+    'dashboard.view', 'dashboard.admin', 'map.view', 'map.edit', 'scans.view', 'scans.classify', 'scans.delete',
+    'traceability.view', 'traceability.edit', 'transport.view', 'transport.edit', 'compliance.view',
+    'compliance.submit', 'compliance.approve', 'users.manage', 'users.invite', 'audit.view', 'system.configure',
   ],
 }
 
@@ -96,10 +48,27 @@ export function can(role: Role, permission: string): boolean {
   return PERMISSIONS[role]?.includes(permission) ?? false
 }
 
-// Nav items visible per role
+// Single source of truth for role colors — every role-tagged UI (dashboard
+// greeting card, admin badges, login demo button, etc.) reads from here so
+// a given role always renders in the same color everywhere.
+export type RoleTone = 'danger' | 'warning' | 'info' | 'success' | 'accent'
+
+export const ROLE_THEME: Record<Role, { tone: RoleTone; text: string; bg: string; solidBg: string }> = {
+  system_admin: { tone: 'danger', text: 'text-destructive', bg: 'bg-destructive/10 border-destructive/20', solidBg: 'bg-destructive' },
+  org_admin: { tone: 'accent', text: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', solidBg: 'bg-blue-500' },
+  mine_manager: { tone: 'warning', text: 'text-primary', bg: 'bg-primary/10 border-primary/20', solidBg: 'bg-primary' },
+  geologist: { tone: 'info', text: 'text-accent', bg: 'bg-accent/10 border-accent/20', solidBg: 'bg-accent' },
+  compliance_manager: {
+    tone: 'success', text: 'text-[var(--success)]', bg: 'bg-[var(--success)]/10 border-[var(--success)]/20',
+    solidBg: 'bg-[var(--success)]',
+  },
+}
+
+// Nav items visible per role - updated for unified map experience
 export const ROLE_NAV: Record<Role, string[]> = {
-  system_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
-  mine_analyst: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance'],
   geologist: ['/dashboard', '/map', '/scans', '/traceability'],
-  compliance_officer: ['/dashboard', '/compliance', '/traceability', '/transport', '/scans'],
+  mine_manager: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance'],
+  compliance_manager: ['/dashboard', '/compliance', '/traceability', '/transport', '/scans'],
+  org_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
+  system_admin: ['/dashboard', '/map', '/scans', '/traceability', '/transport', '/compliance', '/admin'],
 }
